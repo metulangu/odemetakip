@@ -186,9 +186,9 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
       dueDay: safeDueDay,
       diffDays: 0,
       status: 'paid',
-      text: `Ayın ${safeDueDay}'i (Ödendi)`,
-      shortText: `Ödendi`,
-      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
+      text: 'Ödendi',
+      shortText: 'Ödendi',
+      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25',
       dotClass: 'bg-emerald-500'
     };
   }
@@ -1452,7 +1452,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               {/* Table Header (Desktop Only) */}
               <div className="hidden md:grid md:grid-cols-12 items-center px-4 py-2.5 bg-slate-50/80 dark:bg-zinc-900/60 border-b border-slate-200/80 dark:border-zinc-800/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 select-none">
                 <div className="col-span-5 flex items-center gap-2 pl-2">
-                  <span>Gider Kalemi & Kategori & Son Ödeme Vadesi</span>
+                  <span>Gider Kalemi · Kategori · Vade Durumu · Son Gün</span>
                 </div>
                 <div className="col-span-2 text-right pr-3">
                   <span>{currentMonthStats.prevIdx !== null ? `${MONTHS_TR[currentMonthStats.prevIdx].full} (Geçen Ay)` : 'Önceki Ay'}</span>
@@ -1512,38 +1512,41 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                         </div>
 
                         {/* Badges: Category & Due Day / Alert */}
-                        <div className="flex items-center gap-1.5 shrink-0 pl-7 sm:pl-0">
+                        <div className="flex items-center gap-1.5 shrink-0 pl-7 sm:pl-0 flex-wrap">
+                          {/* Kategori Rozeti */}
                           <button
                             type="button"
                             onClick={() => handleCycleCategory(item.id)}
-                            className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border transition-all cursor-pointer select-none ${catMeta.badgeClass}`}
-                            title="Kategoriyi değiştir"
+                            className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all cursor-pointer select-none ${catMeta.badgeClass}`}
+                            title="Kategoriyi değiştir (tıklayın)"
                           >
                             {catMeta.label}
                           </button>
 
-                          {/* Son Ödeme Tarihi & Uyarı Rozeti */}
+                          {/* Vade Uyarı Rozeti */}
                           <div
-                            className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] select-none transition-all ${dueStatus.badgeClass}`}
-                            title={`Son Ödeme Günü: Ayın ${item.dueDay || 15}. günü`}
+                            className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[11px] select-none transition-all ${dueStatus.badgeClass}`}
                           >
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${dueStatus.dotClass}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dueStatus.dotClass}`} />
                             <span className="font-semibold">{dueStatus.text}</span>
-                            
-                            {/* Inline Vade Günü Seçici */}
-                            <span className="text-[10px] opacity-75 font-mono ml-0.5 border-l border-current/20 pl-1 flex items-center gap-0.5">
-                              <span>Ayın</span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={31}
-                                value={item.dueDay || 15}
-                                onChange={(e) => handleDueDayChange(item.id, parseInt(e.target.value) || 15)}
-                                title="Son ödeme gününü değiştir (1-31)"
-                                className="w-5 text-center bg-transparent border-b border-current/30 font-bold focus:border-current outline-none"
-                              />
-                              <span>'i</span>
-                            </span>
+                          </div>
+
+                          {/* Son Gün (Vade) Kutusu */}
+                          <div
+                            title="Son ödeme gününü değiştirmek için tıklayın (1-31)"
+                            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 border border-slate-200/90 dark:border-zinc-700 text-[11px] text-slate-600 dark:text-zinc-300 transition-colors shadow-2xs group/vade"
+                          >
+                            <Calendar className="w-3 h-3 text-slate-400 group-hover/vade:text-indigo-500 dark:text-zinc-500 transition-colors shrink-0" />
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none">Ayın</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={item.dueDay || 15}
+                              onChange={(e) => handleDueDayChange(item.id, parseInt(e.target.value) || 15)}
+                              className="w-5 text-center font-mono font-bold text-slate-900 dark:text-white bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded px-0.5 py-0.2 outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-[11px] tabular-nums"
+                            />
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none">'i</span>
                           </div>
                         </div>
                       </div>
@@ -1665,17 +1668,17 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
 
                     <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-zinc-700 shrink-0">
                       <Calendar className="w-3 h-3 text-slate-400" />
-                      <span>Ayın</span>
+                      <span className="text-[10px] text-slate-400">Son gün: Ayın</span>
                       <input
                         type="number"
                         min={1}
                         max={31}
                         value={quickAddDueDay}
                         onChange={(e) => setQuickAddDueDay(parseInt(e.target.value) || 15)}
-                        className="w-7 text-center font-bold font-mono bg-transparent outline-none text-slate-900 dark:text-white"
+                        className="w-6 text-center font-bold font-mono bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded px-0.5 outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white"
                         title="Son ödeme günü (1-31)"
                       />
-                      <span>. günü</span>
+                      <span className="text-[10px] text-slate-400">'i</span>
                     </div>
                   </div>
 
