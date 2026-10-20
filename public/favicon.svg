@@ -7,20 +7,20 @@
     </linearGradient>
   </defs>
 
-  <!-- Arka Plan Mor Squircle (Sevilen Mor) -->
+  <!-- Arka Plan Mor Squircle -->
   <rect width="256" height="256" rx="64" fill="url(#purpleBg)" />
 
-  <!-- Çatı Çizgisi (Saf Beyaz, Ferah) -->
+  <!-- Beyaz Çatı Çizgisi (Saf Beyaz, Ferah & Geniş Açılı) -->
   <path d="M 24,118 L 128,30 L 232,118" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
 
-  <!-- Sol Kalp Göz / Pencere (Saf Beyaz, Minimal) -->
+  <!-- Pembe Sol Kalp Göz / Pencere -->
   <path d="M 90, 122 C 84, 108 64, 108 64, 124 C 64, 142 90, 158 90, 158 C 90, 158 116, 142 116, 124 C 116, 108 96, 108 90, 122 Z" 
-        stroke="#FFFFFF" stroke-width="10" fill="#FFFFFF" fill-opacity="0.15" stroke-linecap="round" stroke-linejoin="round" />
+        stroke="#F472B6" stroke-width="10" fill="#F472B6" fill-opacity="0.18" stroke-linecap="round" stroke-linejoin="round" />
 
-  <!-- Sağ Kalp Göz / Pencere (Saf Beyaz, Minimal) -->
+  <!-- Pembe Sağ Kalp Göz / Pencere -->
   <path d="M 166, 122 C 160, 108 140, 108 140, 124 C 140, 142 166, 158 166, 158 C 166, 158 192, 142 192, 124 C 192, 108 172, 108 166, 122 Z" 
-        stroke="#FFFFFF" stroke-width="10" fill="#FFFFFF" fill-opacity="0.15" stroke-linecap="round" stroke-linejoin="round" />
+        stroke="#F472B6" stroke-width="10" fill="#F472B6" fill-opacity="0.18" stroke-linecap="round" stroke-linejoin="round" />
 
-  <!-- Gülen Ağız Çizgisi :) (Saf Beyaz, Sade) -->
+  <!-- Beyaz Gülen Ağız Çizgisi :) (Saf Beyaz) -->
   <path d="M 82, 185 Q 128, 222 174, 185" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" />
 </svg>
