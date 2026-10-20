@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <linearGradient id="purpleBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B0764" />
+      <stop offset="50%" stop-color="#6B21A8" />
+      <stop offset="100%" stop-color="#A855F7" />
+    </linearGradient>
+  </defs>
+
+  <!-- Arka Plan Mor Squircle -->
+  <rect width="256" height="256" rx="64" fill="url(#purpleBg)" />
+
+  <!-- Çatı Çizgisi (Ekrana Tam Sığdırılmış) -->
+  <path d="M 22, 106 L 128, 22 L 234, 106" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Tertemiz Kalp Çizgisi (İç Çizgiler Yok) -->
+  <path d="M 128, 102 C 108, 64 42, 64 42, 126 C 42, 182 128, 234 128, 234 C 128, 234 214, 182 214, 126 C 214, 64 148, 64 128, 102 Z" 
+        stroke="#E879F9" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
