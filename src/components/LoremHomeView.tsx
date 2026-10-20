@@ -324,7 +324,7 @@ function createInitialDemoState(): LoremState {
 
   return {
     version: 3,
-    workspaceTitle: 'LOREM HOME // Gider Matrisi',
+    workspaceTitle: 'Best Home',
     selectedYear: seedYear,
     selectedMonth: 10, // Kasım 2026 (0-indexed: 10)
     viewMode: 'monthly',
@@ -395,7 +395,9 @@ export function sanitize2026Data(state: any): LoremState {
   return {
     ...state,
     version: 3,
-    workspaceTitle: state.workspaceTitle || 'LOREM HOME // Gider Matrisi',
+    workspaceTitle: (!state.workspaceTitle || state.workspaceTitle.includes('LOREM') || state.workspaceTitle.includes('Matrisi')) 
+      ? 'Best Home' 
+      : state.workspaceTitle,
     selectedYear: state.selectedYear || 2026,
     selectedMonth: typeof state.selectedMonth === 'number' ? state.selectedMonth : 10,
     categories: Array.isArray(state.categories) && state.categories.length > 0 ? state.categories : DEFAULT_CATEGORIES,
@@ -510,6 +512,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
   const [quickAddCategory, setQuickAddCategory] = useState<string>('Sabit');
   const [quickAddDueDay, setQuickAddDueDay] = useState<number>(15);
   const [matrixQuickAddName, setMatrixQuickAddName] = useState('');
+
+  // Set document title strictly to Best Home
+  useEffect(() => {
+    document.title = 'Best Home';
+  }, []);
 
   // Fetch initial data from Cloudflare D1 / KV API if online
   useEffect(() => {
@@ -1001,7 +1008,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <img 
               src="/favicon.svg" 
-              alt="LOREM HOME Logo" 
+              alt="Best Home" 
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-xs shrink-0 select-none" 
             />
             <div className="min-w-0">
@@ -1048,9 +1055,6 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                   )}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400 hidden sm:block truncate">
-                Çok Yıllı Veri Tabanı · Vade Uyarı Sistemi · Otomatik Eşitleme
-              </p>
             </div>
           </div>
 

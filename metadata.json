@@ -1,6 +1,6 @@
 {
-  "name": "Argon Finance - Gider ve Fatura Takip Sistemi",
-  "description": "Cloudflare D1 uyumlu, sıfır sürtünmeli çok yıllı matris gider takip ve fatura vade sayaç platformu.",
+  "name": "Best Home",
+  "description": "Best Home",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

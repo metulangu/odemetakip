@@ -125,11 +125,11 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onLogou
             <button
               type="button"
               onClick={() => onSwitchWorkspace('lorem')}
-              title="Lorem Home Ev Bütçesi Arayüzüne Geç"
+              title="Best Home"
               className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all cursor-pointer shadow-2xs shrink-0"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Lorem Home</span>
+              <span className="hidden sm:inline">Best Home</span>
             </button>
           )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 
@@ -7,6 +7,9 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  useEffect(() => {
+    document.title = 'Best Home';
+  }, []);
   const { theme, toggleTheme } = useFinance();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,15 +56,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         <div className="text-center mb-8">
           <img 
             src="/favicon.svg" 
-            alt="LOREM HOME Logo" 
+            alt="Best Home" 
             className="w-16 h-16 rounded-2xl shadow-lg shadow-indigo-500/25 mb-3 inline-block" 
           />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            LOREM HOME
+            Best Home
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Gider ve Bütçe Takip Sistemi
-          </p>
         </div>
 
         {/* Login Card */}
@@ -166,7 +166,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-6">
-          LOREM HOME &bull; Güvenli Yönetim Paneli
+          Best Home
         </p>
       </div>
     </div>
