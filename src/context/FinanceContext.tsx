@@ -68,39 +68,12 @@ const STORAGE_KEY_THEME = 'argon_finance_theme_v2';
 const INITIAL_USERS: User[] = [
   {
     id: 'user-admin',
-    email: 'mturkey11@gmail.com',
-    name: 'Mustafa Turkey (Yönetici)',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mustafa',
+    email: 'admin@argon.local',
+    name: 'Admin',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
     role: 'ADMIN',
     status: 'APPROVED',
     createdAt: '2025-01-01',
-  },
-  {
-    id: 'user-member-1',
-    email: 'ahmet.demir@argon.com',
-    name: 'Ahmet Demir (Finans Uzmanı)',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmet',
-    role: 'MEMBER',
-    status: 'APPROVED',
-    createdAt: '2025-03-12',
-  },
-  {
-    id: 'user-pending-1',
-    email: 'selin.kaya@argon.com',
-    name: 'Selin Kaya (Yeni Katılımcı)',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Selin',
-    role: 'MEMBER',
-    status: 'PENDING',
-    createdAt: '2026-10-14',
-  },
-  {
-    id: 'user-blocked-1',
-    email: 'caner.unal@argon.com',
-    name: 'Caner Ünal (Erişimi Kaldırılmış)',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Caner',
-    role: 'MEMBER',
-    status: 'BLOCKED',
-    createdAt: '2024-08-20',
   },
 ];
 

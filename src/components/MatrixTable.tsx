@@ -50,6 +50,7 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ onOpenNewItemModal }) 
   const [editingCell, setEditingCell] = useState<{ itemId: string; year: number; month: number } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [monthlyViewType, setMonthlyViewType] = useState<'single' | 'threeMonth'>('single');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,7 +77,13 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ onOpenNewItemModal }) 
   // Compute active month columns based on ViewMode
   const columns = useMemo(() => {
     if (viewMode === 'monthly') {
-      // Monthly Focus: shows focused month and adjacent 2 months
+      if (monthlyViewType === 'single') {
+        // Ekranda sadece odak içinde bulunulan ay olsun
+        return [
+          { year: selectedYear, month: focusedMonth, isFocused: true },
+        ];
+      }
+      // Şimdiki arayüz (3 Aylık Odak): seçili ay ve önceki/sonraki aylar
       const prevM = focusedMonth === 1 ? 12 : focusedMonth - 1;
       const prevY = focusedMonth === 1 ? selectedYear - 1 : selectedYear;
       const nextM = focusedMonth === 12 ? 1 : focusedMonth + 1;
@@ -108,7 +115,7 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ onOpenNewItemModal }) 
       }
       return stream;
     }
-  }, [viewMode, selectedYear, focusedMonth]);
+  }, [viewMode, selectedYear, focusedMonth, monthlyViewType]);
 
   // Save inline edit
   const commitEdit = (nextAction?: 'down' | 'right' | 'none') => {
@@ -244,23 +251,57 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ onOpenNewItemModal }) 
             </div>
           )}
 
-          {/* Monthly focus specific month selector */}
+          {/* Monthly focus specific controls (Odak Ayı vs 3 Aylık Akış) */}
           {viewMode === 'monthly' && (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Buton 1: Odak İçinde Bulunulan Ay (Tek Ay) */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setFocusedMonth(focusedMonth === 1 ? 12 : focusedMonth - 1)}
+                  className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded cursor-pointer transition-colors"
+                  title="Önceki Ay"
+                  aria-label="Önceki Ay"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMonthlyViewType('single')}
+                  className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                    monthlyViewType === 'single'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                  title={`${MONTH_NAMES_TR[focusedMonth - 1]} ayına odaklan (Ekranda sadece bu ay)`}
+                >
+                  Sadece {MONTH_NAMES_TR[focusedMonth - 1]}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFocusedMonth(focusedMonth === 12 ? 1 : focusedMonth + 1)}
+                  className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded cursor-pointer transition-colors"
+                  title="Sonraki Ay"
+                  aria-label="Sonraki Ay"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Buton 2: Şimdiki Arayüz (3 Aylık Görünüm) */}
               <button
-                onClick={() => setFocusedMonth(focusedMonth === 1 ? 12 : focusedMonth - 1)}
-                className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded"
+                type="button"
+                onClick={() => setMonthlyViewType('threeMonth')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                  monthlyViewType === 'threeMonth'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
+                title="Şimdiki arayüz (Önceki - Seçili - Sonraki 3 ay)"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 px-2">
-                {MONTH_NAMES_TR[focusedMonth - 1]}
-              </span>
-              <button
-                onClick={() => setFocusedMonth(focusedMonth === 12 ? 1 : focusedMonth + 1)}
-                className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
+                3 Aylık Görünüm
               </button>
             </div>
           )}
