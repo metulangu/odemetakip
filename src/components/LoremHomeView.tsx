@@ -1509,7 +1509,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                               const updated = data.items.map(it => it.id === item.id ? { ...it, name: val } : it);
                               saveData({ ...data, items: updated });
                             }}
-                            className="font-semibold text-sm text-slate-800 dark:text-zinc-100 bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 rounded-lg px-2 py-1 min-w-0 flex-1 outline-none transition-all truncate"
+                            className="font-semibold text-sm text-slate-800 dark:text-zinc-100 bg-white/80 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-700/80 hover:border-slate-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 focus:bg-white dark:focus:bg-zinc-900 rounded-lg px-2.5 py-1 min-w-0 flex-1 outline-none transition-all truncate shadow-2xs"
                           />
                         </div>
 
@@ -1601,7 +1601,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                             value={noteText}
                             placeholder="kısa not..."
                             onChange={(e) => handleNoteChange(item.id, mIdx, e.target.value)}
-                            className="w-full text-xs text-slate-600 dark:text-zinc-300 placeholder-slate-300 dark:placeholder-zinc-600 bg-transparent border border-transparent hover:border-slate-200 dark:hover:border-zinc-800 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 rounded-lg px-2.5 py-1 outline-none transition-all text-right md:text-left"
+                            className="w-full text-xs text-slate-700 dark:text-zinc-300 placeholder-slate-400 dark:placeholder-zinc-500 bg-white/80 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-700/80 hover:border-slate-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 focus:bg-white dark:focus:bg-zinc-900 rounded-lg px-2.5 py-1.5 outline-none transition-all text-right md:text-left shadow-2xs"
                           />
                         </div>
                       </div>
@@ -1627,7 +1627,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                                 }
                               }}
                               placeholder="0"
-                              className="w-full text-right font-mono font-bold text-sm sm:text-base tabular-nums pl-7 pr-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 focus:bg-white dark:focus:bg-zinc-900 text-slate-900 dark:text-white border border-slate-200/90 dark:border-zinc-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 outline-none transition-all"
+                              className="w-full text-right font-mono font-bold text-sm sm:text-base tabular-nums pl-7 pr-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900/80 hover:border-slate-400 dark:hover:border-zinc-600 text-slate-900 dark:text-white border border-slate-300 dark:border-zinc-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 outline-none transition-all shadow-2xs"
                             />
                           </div>
                         </div>
@@ -1665,7 +1665,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               {/* Bottom Quick Add Row */}
               <div className="p-2.5 sm:px-4 sm:py-3 bg-slate-50/90 dark:bg-zinc-900/70 border-t border-slate-200/90 dark:border-zinc-800/90">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="flex items-center gap-2 flex-1 bg-white dark:bg-zinc-850 border border-slate-200 dark:border-zinc-700/80 focus-within:border-indigo-500 rounded-xl px-3 py-2 shadow-2xs transition-all flex-wrap">
+                  <div className="flex items-center gap-2 flex-1 bg-white dark:bg-zinc-850 border border-slate-300 dark:border-zinc-700/80 focus-within:border-indigo-500 rounded-xl px-3 py-2 shadow-2xs transition-all flex-wrap">
                     <PlusCircle className="w-4 h-4 text-indigo-500 shrink-0" />
                     <input
                       type="text"
@@ -1830,12 +1830,12 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                                     }}
                                     placeholder="—"
-                                    className={`w-full text-right font-mono text-[11px] sm:text-xs py-1 px-1.5 rounded-lg border outline-none transition-all ${
+                                    className={`w-full text-right font-mono text-[11px] sm:text-xs py-1 px-1.5 rounded-lg border outline-none transition-all shadow-2xs ${
                                       val > 0
                                         ? isPaid
-                                          ? 'border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300 font-semibold'
-                                          : 'border-amber-300 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 font-semibold'
-                                        : 'border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-slate-400 bg-transparent'
+                                          ? 'border-emerald-400 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300 font-semibold'
+                                          : 'border-amber-400 dark:border-amber-800/80 bg-amber-50/70 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 font-semibold'
+                                        : 'border-slate-300/80 dark:border-zinc-800/80 hover:border-slate-400 dark:hover:border-zinc-700 text-slate-400 bg-white/70 dark:bg-zinc-900/40'
                                     }`}
                                   />
                                 </div>
@@ -1915,7 +1915,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
 
               {/* Matrix Quick Add Row */}
               <div className="p-2.5 sm:px-4 sm:py-3 bg-slate-50/90 dark:bg-zinc-900/70 border-t border-slate-200/90 dark:border-zinc-800/90 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <div className="flex items-center gap-2 flex-1 bg-white dark:bg-zinc-850 border border-slate-200 dark:border-zinc-700/80 focus-within:border-indigo-500 rounded-xl px-3 py-1.5">
+                <div className="flex items-center gap-2 flex-1 bg-white dark:bg-zinc-850 border border-slate-300 dark:border-zinc-700/80 focus-within:border-indigo-500 rounded-xl px-3 py-1.5 shadow-2xs">
                   <PlusCircle className="w-4 h-4 text-indigo-500 shrink-0" />
                   <input
                     type="text"
@@ -2236,7 +2236,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddCategory();
                     }}
-                    className="w-full bg-white dark:bg-zinc-900 text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-zinc-900 text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-500 shadow-2xs"
                   />
                 </div>
 
