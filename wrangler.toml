@@ -5,8 +5,7 @@ compatibility_date = "2024-04-01"
 [assets]
 directory = "./dist"
 
-# D1 veri tabanı Cloudflare panelinden bağlandığında otomatik devreye girer
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "odemetakip_db"
-# database_id = "xxxx-xxxx-xxxx"
+[[d1_databases]]
+binding = "DB"
+database_name = "odemetakip_db"
+database_id = "1cafeb1b-d43a-494b-b519-a8b6954b72b1"
