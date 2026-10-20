@@ -999,9 +999,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
           
           {/* Brand & Workspace Title */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-xs">
-              <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
+            <img 
+              src="/favicon.svg" 
+              alt="LOREM HOME Logo" 
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-xs shrink-0 select-none" 
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <input

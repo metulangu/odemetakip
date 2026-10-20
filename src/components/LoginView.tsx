@@ -51,9 +51,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/25 text-white font-bold text-2xl tracking-wider mb-3">
-            L
-          </div>
+          <img 
+            src="/favicon.svg" 
+            alt="LOREM HOME Logo" 
+            className="w-16 h-16 rounded-2xl shadow-lg shadow-indigo-500/25 mb-3 inline-block" 
+          />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             LOREM HOME
           </h1>

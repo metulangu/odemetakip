@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4338CA" />
+      <stop offset="45%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+    <linearGradient id="houseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1B4B" />
+      <stop offset="100%" stop-color="#312E81" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1E1B4B" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+
+  <!-- Subtle Inner Border Glow -->
+  <rect x="8" y="8" width="496" height="496" rx="120" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="8" />
+
+  <!-- Main House Structure -->
+  <g filter="url(#dropShadow)">
+    <!-- Chimney -->
+    <path d="M334 130 V195 L374 228 V138 C374 133.6 370.4 130 366 130 H342 C337.6 130 334 133.6 334 138 Z" fill="#E2E8F0" />
+    
+    <!-- House Silhouette (Roof + Walls) -->
+    <path d="M256 94 L88 232 C80 238.5 84.5 252 95 252 H126 V404 C126 416 136 426 148 426 H364 C376 426 386 416 386 404 V252 H417 C427.5 252 432 238.5 424 232 Z" fill="url(#houseGrad)" />
+
+    <!-- Matrix Dashboard Window inside House -->
+    <rect x="180" y="246" width="152" height="142" rx="22" fill="url(#innerGrad)" />
+
+    <!-- Matrix Tracking Bars -->
+    <!-- Bar 1: Fatura / Su / Elektrik -->
+    <rect x="202" y="324" width="20" height="46" rx="7" fill="#38BDF8" />
+    <!-- Bar 2: İletişim / Sabit -->
+    <rect x="232" y="292" width="20" height="78" rx="7" fill="#818CF8" />
+    <!-- Bar 3: Ödeme / Bütçe Başarısı -->
+    <rect x="262" y="268" width="20" height="102" rx="7" fill="#10B981" />
+    
+    <!-- Golden Status Indicator (Vade / Bildirim Spark) -->
+    <circle cx="304" cy="272" r="10" fill="#F59E0B" />
+  </g>
+</svg>
