@@ -2,8 +2,9 @@ name = "odemetakip"
 compatibility_date = "2024-04-01"
 pages_build_output_dir = "dist"
 
-# Cloudflare D1 Veri Tabanı Bağlantısı
-# Cloudflare panelinde veya 'npx wrangler d1 create odemetakip_db' ile oluşturulan D1 ID'si buraya eklenir
+[assets]
+directory = "./dist"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "odemetakip_db"
