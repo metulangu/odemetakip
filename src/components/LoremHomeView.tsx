@@ -1531,22 +1531,45 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                             <span className="font-semibold">{dueStatus.text}</span>
                           </div>
 
-                          {/* Son Gün (Vade) Kutusu */}
+                          {/* Son Gün (Vade Günü) Buton & Seçici - Net, Okunabilir ve Şık */}
                           <div
-                            title="Son ödeme gününü değiştirmek için tıklayın (1-31)"
-                            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 border border-slate-200/90 dark:border-zinc-700 text-[11px] text-slate-600 dark:text-zinc-300 transition-colors shadow-2xs group/vade"
+                            title="Son ödeme gününü değiştirmek için +/- butonlarını kullanın veya doğrudan yazın (1-31)"
+                            className="shrink-0 inline-flex items-center rounded-xl bg-slate-100 hover:bg-slate-200/70 dark:bg-zinc-800/90 dark:hover:bg-zinc-700/70 border border-slate-200/90 dark:border-zinc-700/80 p-0.5 shadow-2xs transition-colors"
                           >
-                            <Calendar className="w-3 h-3 text-slate-400 group-hover/vade:text-indigo-500 dark:text-zinc-500 transition-colors shrink-0" />
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none">Ayın</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={31}
-                              value={item.dueDay || 15}
-                              onChange={(e) => handleDueDayChange(item.id, parseInt(e.target.value) || 15)}
-                              className="w-5 text-center font-mono font-bold text-slate-900 dark:text-white bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded px-0.5 py-0.2 outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-[11px] tabular-nums"
-                            />
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none">'i</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDueDayChange(item.id, Math.max(1, (item.dueDay || 15) - 1))}
+                              className="w-5 h-5 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-zinc-700 transition-colors text-xs font-bold select-none cursor-pointer"
+                              title="1 gün azalt"
+                            >
+                              −
+                            </button>
+
+                            <div className="flex items-center gap-1 px-1">
+                              <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none font-medium">Ayın</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={2}
+                                value={item.dueDay || 15}
+                                onChange={(e) => {
+                                  const parsed = parseInt(e.target.value.replace(/\D/g, ''));
+                                  if (!isNaN(parsed)) handleDueDayChange(item.id, Math.min(31, Math.max(1, parsed)));
+                                }}
+                                className="w-6 text-center font-mono font-extrabold text-xs text-slate-900 dark:text-white bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-md py-0.2 outline-none focus:ring-1 focus:ring-indigo-500 tabular-nums shadow-xs"
+                              />
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none font-medium">'i</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDueDayChange(item.id, Math.min(31, (item.dueDay || 15) + 1))}
+                              className="w-5 h-5 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-zinc-700 transition-colors text-xs font-bold select-none cursor-pointer"
+                              title="1 gün artır"
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1666,19 +1689,22 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                       {quickAddCategory}
                     </button>
 
-                    <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-zinc-700 shrink-0">
-                      <Calendar className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] text-slate-400">Son gün: Ayın</span>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-zinc-700 shrink-0">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400 select-none font-medium">Son gün: Ayın</span>
                       <input
-                        type="number"
-                        min={1}
-                        max={31}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
                         value={quickAddDueDay}
-                        onChange={(e) => setQuickAddDueDay(parseInt(e.target.value) || 15)}
-                        className="w-6 text-center font-bold font-mono bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded px-0.5 outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white"
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value.replace(/\D/g, ''));
+                          if (!isNaN(parsed)) setQuickAddDueDay(Math.min(31, Math.max(1, parsed)));
+                        }}
+                        className="w-6 text-center font-extrabold font-mono bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-md py-0.2 outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white text-xs tabular-nums shadow-2xs"
                         title="Son ödeme günü (1-31)"
                       />
-                      <span className="text-[10px] text-slate-400">'i</span>
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400 select-none font-medium">'i</span>
                     </div>
                   </div>
 
