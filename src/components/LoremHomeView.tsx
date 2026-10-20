@@ -27,11 +27,20 @@ import {
   Plus, 
   Bell, 
   Cloud, 
-  CloudCheck, 
   Download, 
   Upload, 
   Database,
-  ArrowRight
+  ArrowRight,
+  Home,
+  Zap,
+  Droplets,
+  Flame,
+  Fuel,
+  Smartphone,
+  Tv,
+  CreditCard,
+  HeartHandshake,
+  Building2
 } from 'lucide-react';
 
 export interface LoremYearData {
@@ -61,7 +70,7 @@ export interface LoremCategory {
   color: string;
 }
 
-const STORAGE_KEY = 'lorem_home_expense_matrix_v1';
+const STORAGE_KEY = 'lorem_home_expense_matrix_v3';
 
 const MONTHS_TR = [
   { index: 0, short: 'Oca', full: 'Ocak' },
@@ -136,6 +145,7 @@ const COLOR_PRESETS = [
 ];
 
 export interface LoremState {
+  version?: number;
   workspaceTitle: string;
   selectedYear: number;
   selectedMonth: number;
@@ -157,13 +167,37 @@ export interface DueStatus {
 }
 
 /**
+ * Kalem ismine ve kategorisine göre renkli şık ikon üretir
+ */
+export function renderItemIcon(name: string, category: string) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('kira')) return <Home className="w-4 h-4 text-violet-500" />;
+  if (n.includes('elektrik')) return <Zap className="w-4 h-4 text-amber-500" />;
+  if (n.includes('su')) return <Droplets className="w-4 h-4 text-sky-500" />;
+  if (n.includes('doğalgaz') || n.includes('dogalgaz') || n.includes('gaz')) return <Flame className="w-4 h-4 text-orange-500" />;
+  if (n.includes('yakıt') || n.includes('yakit') || n.includes('benzin') || n.includes('mazot')) return <Fuel className="w-4 h-4 text-amber-600" />;
+  if (n.includes('tel') || n.includes('telefon') || n.includes('mobil') || n.includes('mehmet') || n.includes('meryem') || n.includes('azra')) return <Smartphone className="w-4 h-4 text-emerald-500" />;
+  if (n.includes('tv') || n.includes('internet') || n.includes('fiber')) return <Tv className="w-4 h-4 text-indigo-500" />;
+  if (n.includes('kart') || n.includes('kredi') || n.includes('banka')) return <CreditCard className="w-4 h-4 text-rose-500" />;
+  if (n.includes('bakıcı') || n.includes('bakici')) return <HeartHandshake className="w-4 h-4 text-pink-500" />;
+  if (n.includes('aidat') || n.includes('site') || n.includes('bina')) return <Building2 className="w-4 h-4 text-blue-500" />;
+  
+  if (category === 'Fatura') return <Zap className="w-4 h-4 text-sky-500" />;
+  if (category === 'Sabit') return <Home className="w-4 h-4 text-violet-500" />;
+  if (category === 'Ulaşım') return <Fuel className="w-4 h-4 text-amber-500" />;
+  if (category === 'Finans') return <CreditCard className="w-4 h-4 text-rose-500" />;
+  if (category === 'İletişim') return <Smartphone className="w-4 h-4 text-emerald-500" />;
+  return <Tag className="w-4 h-4 text-slate-400" />;
+}
+
+/**
  * Belirli bir yıla ait verileri döndürür. Yoksa oluşturur.
  */
 export function getItemYearData(item: LoremItem, year: number): LoremYearData {
   if (item.years && item.years[year]) {
     return item.years[year];
   }
-  // Geriye dönük uyumluluk: 2026 yılı için root amounts kontrolü
+  // Geriye dönük uyumluluk
   if (year === 2026 && Array.isArray(item.amounts) && item.amounts.length === 12) {
     return {
       amounts: [...item.amounts],
@@ -210,7 +244,7 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
       status: 'green',
       text: `${diffDays} gün kaldı`,
       shortText: `${diffDays} gün`,
-      badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+      badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
       dotClass: 'bg-emerald-500'
     };
   } else if (diffDays >= 3 && diffDays <= 7) {
@@ -220,7 +254,7 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
       status: 'yellow',
       text: `${diffDays} gün kaldı`,
       shortText: `${diffDays} gün`,
-      badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-medium',
+      badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium',
       dotClass: 'bg-amber-500'
     };
   } else {
@@ -240,7 +274,7 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
       status: 'red',
       text,
       shortText,
-      badgeClass: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/35 font-semibold',
+      badgeClass: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/35 font-semibold',
       dotClass: 'bg-rose-500 animate-pulse'
     };
   }
@@ -248,124 +282,27 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
 
 function createInitialDemoState(): LoremState {
   const seedYear = 2026;
+  
+  // Kullanıcının talebi:
+  // Ocak'tan Ekim'e kadar 10 ay: hepsi 0 ₺ ve ödendi (paid: true)
+  // Kasım ve Aralık: 0 ₺ ve bekliyor (paid: false), Kasım'dan devam edilecek
+  const defaultAmounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const defaultPaid = [true, true, true, true, true, true, true, true, true, true, false, false];
+
   const rawItems = [
-    {
-      id: 'item-1',
-      name: 'Kira',
-      category: 'Sabit',
-      dueDay: 1,
-      amounts: [24000, 24000, 24000, 24000, 24000, 24000, 28000, 28000, 28000, 28000, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 6: 'Temmuz kira artışı', 8: 'Eylül ödendi', 9: 'Havale ile ödendi' }
-    },
-    {
-      id: 'item-2',
-      name: 'Elektrik',
-      category: 'Fatura',
-      dueDay: 15,
-      amounts: [890, 860, 820, 780, 750, 920, 1340, 1480, 1120, 980, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 7: 'Klima kullanımı', 9: 'Otomatik ödeme' }
-    },
-    {
-      id: 'item-3',
-      name: 'Su',
-      category: 'Fatura',
-      dueDay: 20,
-      amounts: [410, 390, 420, 440, 460, 520, 610, 640, 530, 490, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: 'Otomatik ödeme' }
-    },
-    {
-      id: 'item-4',
-      name: 'Doğalgaz',
-      category: 'Fatura',
-      dueDay: 24,
-      amounts: [3400, 3650, 2800, 1450, 420, 280, 260, 260, 340, 1250, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, false, false, false],
-      notes: { 9: 'Kombi açıldı · Son ödeme 24 Ekim' }
-    },
-    {
-      id: 'item-5',
-      name: 'Yakıt',
-      category: 'Ulaşım',
-      dueDay: 10,
-      amounts: [4200, 4100, 4500, 4800, 5100, 5600, 6400, 6200, 5400, 5800, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: '2 depo motorin' }
-    },
-    {
-      id: 'item-6',
-      name: 'Tel Mehmet',
-      category: 'İletişim',
-      dueDay: 18,
-      amounts: [540, 540, 540, 540, 540, 680, 680, 680, 680, 680, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: 'Kurumsal tarife' }
-    },
-    {
-      id: 'item-7',
-      name: 'Tel Meryem',
-      category: 'İletişim',
-      dueDay: 18,
-      amounts: [480, 480, 480, 480, 480, 590, 590, 590, 590, 590, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: 'Faturalı hat' }
-    },
-    {
-      id: 'item-8',
-      name: 'Tel Azra',
-      category: 'İletişim',
-      dueDay: 18,
-      amounts: [290, 290, 290, 290, 290, 350, 350, 350, 350, 350, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, false, false, false],
-      notes: { 9: 'Genç paketi' }
-    },
-    {
-      id: 'item-9',
-      name: 'TV İnternet',
-      category: 'İletişim',
-      dueDay: 12,
-      amounts: [750, 750, 750, 750, 750, 750, 890, 890, 890, 890, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: '1000 Mbps Fiber + TV' }
-    },
-    {
-      id: 'item-10',
-      name: 'Kredi Kartı Mehmet',
-      category: 'Finans',
-      dueDay: 22,
-      amounts: [18400, 16900, 19200, 21500, 19800, 22400, 26800, 24500, 21900, 23400, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, false, false, false],
-      notes: { 9: 'Son ödeme 22 Ekim' }
-    },
-    {
-      id: 'item-11',
-      name: 'Kredi Kartı Meryem',
-      category: 'Finans',
-      dueDay: 25,
-      amounts: [11200, 10800, 12400, 13100, 12600, 14200, 15900, 14800, 13600, 14250, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, false, false, false],
-      notes: { 9: 'Market + giyim taksitleri' }
-    },
-    {
-      id: 'item-12',
-      name: 'Bakıcı',
-      category: 'Sabit',
-      dueDay: 5,
-      amounts: [19500, 19500, 19500, 19500, 19500, 19500, 22000, 22000, 22000, 22000, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, true, false, false],
-      notes: { 9: 'Ayın 5\'inde ödendi' }
-    },
-    {
-      id: 'item-13',
-      name: 'Site Aidatı',
-      category: 'Sabit',
-      dueDay: 30,
-      amounts: [1500, 1500, 1500, 1500, 1500, 1500, 1800, 1800, 1800, 1800, 0, 0],
-      paid: [true, true, true, true, true, true, true, true, true, false, false, false],
-      notes: { 9: 'Bina yönetimi aidatı' }
-    }
+    { id: 'item-1', name: 'Kira', category: 'Sabit', dueDay: 1 },
+    { id: 'item-2', name: 'Elektrik', category: 'Fatura', dueDay: 15 },
+    { id: 'item-3', name: 'Su', category: 'Fatura', dueDay: 20 },
+    { id: 'item-4', name: 'Doğalgaz', category: 'Fatura', dueDay: 24 },
+    { id: 'item-5', name: 'Yakıt', category: 'Ulaşım', dueDay: 10 },
+    { id: 'item-6', name: 'Tel Mehmet', category: 'İletişim', dueDay: 18 },
+    { id: 'item-7', name: 'Tel Meryem', category: 'İletişim', dueDay: 18 },
+    { id: 'item-8', name: 'Tel Azra', category: 'İletişim', dueDay: 18 },
+    { id: 'item-9', name: 'TV İnternet', category: 'İletişim', dueDay: 12 },
+    { id: 'item-10', name: 'Kredi Kartı Mehmet', category: 'Finans', dueDay: 22 },
+    { id: 'item-11', name: 'Kredi Kartı Meryem', category: 'Finans', dueDay: 25 },
+    { id: 'item-12', name: 'Bakıcı', category: 'Sabit', dueDay: 5 },
+    { id: 'item-13', name: 'Site Aidatı', category: 'Sabit', dueDay: 30 }
   ];
 
   const items: LoremItem[] = rawItems.map(raw => ({
@@ -375,25 +312,94 @@ function createInitialDemoState(): LoremState {
     dueDay: raw.dueDay,
     years: {
       [seedYear]: {
-        amounts: raw.amounts,
-        paid: raw.paid,
-        notes: raw.notes
+        amounts: [...defaultAmounts],
+        paid: [...defaultPaid],
+        notes: {}
       }
     },
-    amounts: raw.amounts,
-    paid: raw.paid,
-    notes: raw.notes
+    amounts: [...defaultAmounts],
+    paid: [...defaultPaid],
+    notes: {}
   }));
 
   return {
+    version: 3,
     workspaceTitle: 'LOREM HOME // Gider Matrisi',
     selectedYear: seedYear,
-    selectedMonth: 9, // Ekim (0-indexed)
+    selectedMonth: 10, // Kasım 2026 (0-indexed: 10)
     viewMode: 'monthly',
     activeCategoryFilter: 'Tümü',
     quickAddCategory: 'Sabit',
     categories: DEFAULT_CATEGORIES,
     items
+  };
+}
+
+/**
+ * 2026 yılının Ocak-Ekim (0-9) aylarını sıfırlayan ve Ödendi yapan,
+ * Kasım ve sonrasına dokunmayan sanitizasyon fonksiyonu.
+ */
+export function sanitize2026Data(state: any): LoremState {
+  if (!state || !Array.isArray(state.items)) return createInitialDemoState();
+
+  const defaultState = createInitialDemoState();
+  const defaultItems = defaultState.items;
+
+  const updatedItems: LoremItem[] = state.items.map((it: any) => {
+    const itemCopy = { ...it };
+    const defaultMatch = defaultItems.find(
+      d => d.id === it.id || d.name.toLowerCase().trim() === (it.name || '').toLowerCase().trim()
+    );
+    const dueDay = typeof it.dueDay === 'number' ? it.dueDay : (defaultMatch ? defaultMatch.dueDay : 15);
+    itemCopy.dueDay = dueDay;
+
+    const years: Record<number, LoremYearData> = it.years ? { ...it.years } : {};
+
+    // 2026 yılını garantiye al
+    const y2026 = years[2026] ? { ...years[2026] } : {
+      amounts: Array(12).fill(0),
+      paid: Array(12).fill(false),
+      notes: {}
+    };
+
+    const amounts = Array.isArray(y2026.amounts) ? [...y2026.amounts] : Array(12).fill(0);
+    while (amounts.length < 12) amounts.push(0);
+
+    const paid = Array.isArray(y2026.paid) ? [...y2026.paid] : Array(12).fill(false);
+    while (paid.length < 12) paid.push(false);
+
+    const notes = y2026.notes ? { ...y2026.notes } : {};
+
+    // Kullanıcı kuralı: 2026 Ocak'tan Ekim'e kadar (0..9) tüm tutarlar 0 ₺ ve Ödendi (paid: true)
+    for (let m = 0; m <= 9; m++) {
+      amounts[m] = 0;
+      paid[m] = true;
+      delete notes[m];
+    }
+
+    years[2026] = {
+      amounts,
+      paid,
+      notes
+    };
+    itemCopy.years = years;
+
+    // Geriye dönük uyumluluk için root verileri de güncelle
+    itemCopy.amounts = [...amounts];
+    itemCopy.paid = [...paid];
+    itemCopy.notes = { ...notes };
+
+    return itemCopy;
+  });
+
+  return {
+    ...state,
+    version: 3,
+    workspaceTitle: state.workspaceTitle || 'LOREM HOME // Gider Matrisi',
+    selectedYear: state.selectedYear || 2026,
+    selectedMonth: typeof state.selectedMonth === 'number' ? state.selectedMonth : 10,
+    categories: Array.isArray(state.categories) && state.categories.length > 0 ? state.categories : DEFAULT_CATEGORIES,
+    items: updatedItems
   };
 }
 
@@ -456,48 +462,29 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.items)) {
-          const categories = Array.isArray(parsed.categories) && parsed.categories.length > 0 
-            ? parsed.categories 
-            : DEFAULT_CATEGORIES;
-          
-          const selYear = parsed.selectedYear || 2026;
-
-          const items: LoremItem[] = parsed.items.map((it: any) => {
-            const itemYears: Record<number, LoremYearData> = it.years || {};
-            // Eğer years[selYear] yoksa, root amounts'tan taşı
-            if (!itemYears[selYear] && Array.isArray(it.amounts)) {
-              itemYears[selYear] = {
-                amounts: it.amounts,
-                paid: it.paid || Array(12).fill(false),
-                notes: it.notes || {}
-              };
-            }
-
-            return {
-              id: it.id || 'item-' + Math.random(),
-              name: it.name || 'Gider',
-              category: it.category || 'Sabit',
-              dueDay: typeof it.dueDay === 'number' ? it.dueDay : 15,
-              years: itemYears,
-              amounts: itemYears[selYear]?.amounts || Array(12).fill(0),
-              paid: itemYears[selYear]?.paid || Array(12).fill(false),
-              notes: itemYears[selYear]?.notes || {}
-            };
-          });
-
-          return {
-            ...createInitialDemoState(),
-            ...parsed,
-            selectedYear: selYear,
-            categories,
-            items
-          };
+          return sanitize2026Data(parsed);
+        }
+      }
+      // Eski versiyonlardan (v2, v1) temizleyerek taşıma
+      const oldSaved = localStorage.getItem('lorem_home_expense_matrix_v2') || localStorage.getItem('lorem_home_expense_matrix_v1');
+      if (oldSaved) {
+        const parsedOld = JSON.parse(oldSaved);
+        if (parsedOld && Array.isArray(parsedOld.items)) {
+          const sanitized = sanitize2026Data(parsedOld);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+          } catch {}
+          return sanitized;
         }
       }
     } catch {
       // fallback
     }
-    return createInitialDemoState();
+    const fresh = createInitialDemoState();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+    } catch {}
+    return fresh;
   });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -534,11 +521,20 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
       })
       .then(remoteData => {
         if (!active || !remoteData || !Array.isArray(remoteData.items)) return;
-        setData(prev => ({
-          ...prev,
-          ...remoteData,
-          selectedYear: remoteData.selectedYear || prev.selectedYear || 2026
-        }));
+        const sanitized = sanitize2026Data(remoteData);
+        setData(sanitized);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+        } catch {}
+
+        // Buluttaki veri eski veya v3 değilse, temizlenmiş güncel hali buluta kaydet
+        if (remoteData.version !== 3) {
+          fetch('/api/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sanitized)
+          }).catch(() => {});
+        }
         setCloudSyncStatus('synced');
       })
       .catch(() => {
@@ -1498,6 +1494,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                           <span className="w-5 text-[11px] font-mono text-slate-400 dark:text-zinc-500 tabular-nums shrink-0 select-none">
                             {String(idx + 1).padStart(2, '0')}
                           </span>
+
+                          {/* Kaleme özel görsel ikon */}
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-zinc-700/80 shadow-2xs">
+                            {renderItemIcon(item.name, item.category)}
+                          </div>
                           
                           <input
                             type="text"
@@ -1533,13 +1534,13 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
 
                           {/* Son Gün (Vade Günü) Buton & Seçici - Net, Okunabilir ve Şık */}
                           <div
-                            title="Son ödeme gününü değiştirmek için +/- butonlarını kullanın veya doğrudan yazın (1-31)"
-                            className="shrink-0 inline-flex items-center rounded-xl bg-slate-100 hover:bg-slate-200/70 dark:bg-zinc-800/90 dark:hover:bg-zinc-700/70 border border-slate-200/90 dark:border-zinc-700/80 p-0.5 shadow-2xs transition-colors"
+                            title="Son ödeme gününü değiştirmek için − / + butonlarını kullanın veya doğrudan yazın (1-31)"
+                            className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-slate-100/90 dark:bg-zinc-800/90 border border-slate-200/90 dark:border-zinc-700/80 p-1 shadow-2xs transition-colors"
                           >
                             <button
                               type="button"
                               onClick={() => handleDueDayChange(item.id, Math.max(1, (item.dueDay || 15) - 1))}
-                              className="w-5 h-5 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-zinc-700 transition-colors text-xs font-bold select-none cursor-pointer"
+                              className="w-5 h-5 flex items-center justify-center rounded-lg bg-white dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-zinc-600/50 shadow-xs transition-colors text-xs font-bold select-none cursor-pointer"
                               title="1 gün azalt"
                             >
                               −
@@ -1547,7 +1548,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
 
                             <div className="flex items-center gap-1 px-1">
                               <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none font-medium">Ayın</span>
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 select-none font-medium">Vade:</span>
                               <input
                                 type="text"
                                 inputMode="numeric"
@@ -1557,15 +1558,15 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                                   const parsed = parseInt(e.target.value.replace(/\D/g, ''));
                                   if (!isNaN(parsed)) handleDueDayChange(item.id, Math.min(31, Math.max(1, parsed)));
                                 }}
-                                className="w-6 text-center font-mono font-extrabold text-xs text-slate-900 dark:text-white bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-md py-0.2 outline-none focus:ring-1 focus:ring-indigo-500 tabular-nums shadow-xs"
+                                className="w-6 text-center font-mono font-bold text-xs text-indigo-700 dark:text-indigo-300 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 rounded-md py-0.5 outline-none focus:ring-1 focus:ring-indigo-500 tabular-nums shadow-xs"
                               />
-                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 select-none font-medium">'i</span>
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 select-none font-medium">. gün</span>
                             </div>
 
                             <button
                               type="button"
                               onClick={() => handleDueDayChange(item.id, Math.min(31, (item.dueDay || 15) + 1))}
-                              className="w-5 h-5 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-zinc-700 transition-colors text-xs font-bold select-none cursor-pointer"
+                              className="w-5 h-5 flex items-center justify-center rounded-lg bg-white dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-zinc-600/50 shadow-xs transition-colors text-xs font-bold select-none cursor-pointer"
                               title="1 gün artır"
                             >
                               +
@@ -1782,8 +1783,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                         <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 group">
                           {/* Sticky Item Name + Category + Due Day */}
                           <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 group-hover:bg-slate-50 dark:group-hover:bg-zinc-850 px-2 sm:px-3 py-2 border-r border-slate-200 dark:border-zinc-800">
-                            <div className="flex items-center justify-between gap-1.5">
-                              <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-md bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-zinc-700/80">
+                                {renderItemIcon(item.name, item.category)}
+                              </div>
+                              <div className="min-w-0 flex-1">
                                 <span className="font-semibold text-slate-800 dark:text-zinc-200 block truncate">
                                   {item.name}
                                 </span>
@@ -1791,7 +1795,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                                   <span className={`px-1.5 py-0.2 rounded border ${catMeta.badgeClass}`}>
                                     {catMeta.label}
                                   </span>
-                                  <span className="font-mono">Vade: {item.dueDay || 15}</span>
+                                  <span className="font-mono">Vade: {item.dueDay || 15}. gün</span>
                                 </div>
                               </div>
                             </div>
@@ -2155,7 +2159,14 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                         return (
                           <tr key={row.item.id} className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/30 transition-colors">
                             <td className="py-2.5 px-3 font-bold text-slate-400">{idx + 1}</td>
-                            <td className="py-2.5 px-3 font-sans font-semibold text-slate-800 dark:text-zinc-200">{row.item.name}</td>
+                            <td className="py-2.5 px-3 font-sans font-semibold text-slate-800 dark:text-zinc-200">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-md bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-zinc-700/80">
+                                  {renderItemIcon(row.item.name, row.item.category)}
+                                </div>
+                                <span className="truncate">{row.item.name}</span>
+                              </div>
+                            </td>
                             <td className="py-2.5 px-3 font-sans">
                               <span className={`inline-block text-[10px] px-2 py-0.5 rounded border ${catMeta.badgeClass}`}>
                                 {catMeta.label}
