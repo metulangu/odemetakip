@@ -395,9 +395,7 @@ export function sanitize2026Data(state: any): LoremState {
   return {
     ...state,
     version: 3,
-    workspaceTitle: (!state.workspaceTitle || state.workspaceTitle.includes('LOREM') || state.workspaceTitle.includes('Matrisi')) 
-      ? 'Best Home' 
-      : state.workspaceTitle,
+    workspaceTitle: 'Best Home',
     selectedYear: state.selectedYear || 2026,
     selectedMonth: typeof state.selectedMonth === 'number' ? state.selectedMonth : 10,
     categories: Array.isArray(state.categories) && state.categories.length > 0 ? state.categories : DEFAULT_CATEGORIES,
@@ -1013,12 +1011,9 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
             />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <input
-                  type="text"
-                  value={data.workspaceTitle}
-                  onChange={(e) => saveData({ ...data, workspaceTitle: e.target.value })}
-                  className="font-bold text-xs sm:text-base tracking-tight bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-900 rounded-md px-1 sm:px-1.5 py-0.5 -ml-1 outline-none transition-all truncate w-28 xs:w-36 sm:w-56 md:w-64"
-                />
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white select-none whitespace-nowrap">
+                  Best Home
+                </span>
 
                 {/* Cloudflare D1 Sync Badge */}
                 <span
