@@ -9,6 +9,8 @@ export default {
 
     // API Endpoint for Database Sync: /api/data
     if (url.pathname === '/api/data') {
+      const targetId = url.searchParams.get("key") === "birthdays" ? "birthdays_workspace" : "lorem_workspace";
+
       if (request.method === 'GET') {
         if (env.DB) {
           try {
@@ -21,8 +23,8 @@ export default {
             ).run();
 
             const row = await env.DB.prepare(
-              "SELECT content FROM workspace_data WHERE id = 'lorem_workspace'"
-            ).first();
+              "SELECT content FROM workspace_data WHERE id = ?1"
+            ).bind(targetId).first();
 
             if (row && (row as any).content) {
               return new Response((row as any).content, {
@@ -55,11 +57,11 @@ export default {
 
             await env.DB.prepare(
               `INSERT INTO workspace_data (id, content, updated_at)
-               VALUES ('lorem_workspace', ?1, CURRENT_TIMESTAMP)
-               ON CONFLICT(id) DO UPDATE SET content = ?1, updated_at = CURRENT_TIMESTAMP`
-            ).bind(contentStr).run();
+               VALUES (?1, ?2, CURRENT_TIMESTAMP)
+               ON CONFLICT(id) DO UPDATE SET content = ?2, updated_at = CURRENT_TIMESTAMP`
+            ).bind(targetId, contentStr).run();
 
-            return new Response(JSON.stringify({ success: true, storage: "D1" }), {
+            return new Response(JSON.stringify({ success: true, storage: "D1", target: targetId }), {
               headers: { "Content-Type": "application/json" }
             });
           }

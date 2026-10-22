@@ -6,7 +6,10 @@ interface Env {
   KV?: any; // Cloudflare KVNamespace binding
 }
 
-export const onRequestGet = async (context: { env: Env }) => {
+export const onRequestGet = async (context: { env: Env; request: Request }) => {
+  const url = new URL(context.request.url);
+  const targetId = url.searchParams.get("key") === "birthdays" ? "birthdays_workspace" : "lorem_workspace";
+
   // 1. Try Cloudflare D1 Database
   if (context.env.DB) {
     try {
@@ -19,8 +22,8 @@ export const onRequestGet = async (context: { env: Env }) => {
       ).run();
 
       const row = await context.env.DB.prepare(
-        "SELECT content FROM workspace_data WHERE id = 'lorem_workspace'"
-      ).first();
+        "SELECT content FROM workspace_data WHERE id = ?1"
+      ).bind(targetId).first();
 
       if (row && row.content) {
         return new Response(row.content, {
@@ -38,7 +41,7 @@ export const onRequestGet = async (context: { env: Env }) => {
   // 2. Try Cloudflare KV fallback
   if (context.env.KV) {
     try {
-      const val = await context.env.KV.get("lorem_workspace");
+      const val = await context.env.KV.get(targetId);
       if (val) {
         return new Response(val, {
           headers: { 
@@ -60,6 +63,8 @@ export const onRequestGet = async (context: { env: Env }) => {
 
 export const onRequestPost = async (context: { env: Env; request: Request }) => {
   try {
+    const url = new URL(context.request.url);
+    const targetId = url.searchParams.get("key") === "birthdays" ? "birthdays_workspace" : "lorem_workspace";
     const body = await context.request.json();
     const contentStr = JSON.stringify(body);
 
@@ -78,9 +83,9 @@ export const onRequestPost = async (context: { env: Env; request: Request }) => 
 
         await context.env.DB.prepare(
           `INSERT INTO workspace_data (id, content, updated_at) 
-           VALUES ('lorem_workspace', ?1, CURRENT_TIMESTAMP) 
-           ON CONFLICT(id) DO UPDATE SET content = ?1, updated_at = CURRENT_TIMESTAMP`
-        ).bind(contentStr).run();
+           VALUES (?1, ?2, CURRENT_TIMESTAMP) 
+           ON CONFLICT(id) DO UPDATE SET content = ?2, updated_at = CURRENT_TIMESTAMP`
+        ).bind(targetId, contentStr).run();
 
         savedStorage = "D1";
       } catch (err: any) {
@@ -91,7 +96,7 @@ export const onRequestPost = async (context: { env: Env; request: Request }) => 
     // 2. Save to KV
     if (context.env.KV) {
       try {
-        await context.env.KV.put("lorem_workspace", contentStr);
+        await context.env.KV.put(targetId, contentStr);
         savedStorage = savedStorage === "none" ? "KV" : `${savedStorage}+KV`;
       } catch (err: any) {
         console.error("KV Save Error:", err);

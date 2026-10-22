@@ -40,7 +40,9 @@ import {
   Tv,
   CreditCard,
   HeartHandshake,
-  Building2
+  Building2,
+  Cake,
+  LayoutGrid
 } from 'lucide-react';
 
 export interface LoremYearData {
@@ -452,10 +454,11 @@ function formatNumber(val: number): string {
 
 interface LoremHomeViewProps {
   onSwitchWorkspace?: (workspace: 'argon') => void;
+  onSwitchModule?: (module: 'hub' | 'birthdays') => void;
   onLogout: () => void;
 }
 
-export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace, onLogout }) => {
+export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace, onSwitchModule, onLogout }) => {
   const [data, setData] = useState<LoremState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1056,6 +1059,32 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
           {/* View Switchers & Right Controls */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             
+            {/* Return to Hub */}
+            {onSwitchModule && (
+              <button
+                type="button"
+                onClick={() => onSwitchModule('hub')}
+                title="Ana Modül Kartlarına Dön"
+                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span className="hidden md:inline">Modüller</span>
+              </button>
+            )}
+
+            {/* Quick Switch to Birthday Tracker */}
+            {onSwitchModule && (
+              <button
+                type="button"
+                onClick={() => onSwitchModule('birthdays')}
+                title="Doğum Günü Takip Sistemine Geç"
+                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-900/40 border border-pink-200/80 dark:border-pink-800 text-pink-700 dark:text-pink-300 transition-all cursor-pointer shadow-2xs"
+              >
+                <Cake className="w-3.5 h-3.5 text-pink-500" />
+                <span className="hidden md:inline">Doğum Günleri</span>
+              </button>
+            )}
+
             {/* View Mode Segmented Control: Monthly, Matrix, and Analytics */}
             <div className="inline-flex p-0.5 sm:p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/70 dark:border-zinc-700/60">
               <button
