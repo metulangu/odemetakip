@@ -13,14 +13,6 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
   // 1. Try Cloudflare D1 Database
   if (context.env.DB) {
     try {
-      await context.env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS workspace_data (
-          id TEXT PRIMARY KEY,
-          content TEXT,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`
-      ).run();
-
       const row = await context.env.DB.prepare(
         "SELECT content FROM workspace_data WHERE id = ?1"
       ).bind(targetId).first();
@@ -73,14 +65,6 @@ export const onRequestPost = async (context: { env: Env; request: Request }) => 
     // 1. Save to D1
     if (context.env.DB) {
       try {
-        await context.env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS workspace_data (
-            id TEXT PRIMARY KEY,
-            content TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )`
-        ).run();
-
         await context.env.DB.prepare(
           `INSERT INTO workspace_data (id, content, updated_at) 
            VALUES (?1, ?2, CURRENT_TIMESTAMP) 

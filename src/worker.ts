@@ -14,14 +14,6 @@ export default {
       if (request.method === 'GET') {
         if (env.DB) {
           try {
-            await env.DB.prepare(
-              `CREATE TABLE IF NOT EXISTS workspace_data (
-                id TEXT PRIMARY KEY,
-                content TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-              )`
-            ).run();
-
             const row = await env.DB.prepare(
               "SELECT content FROM workspace_data WHERE id = ?1"
             ).bind(targetId).first();
@@ -47,14 +39,6 @@ export default {
           const contentStr = JSON.stringify(body);
 
           if (env.DB) {
-            await env.DB.prepare(
-              `CREATE TABLE IF NOT EXISTS workspace_data (
-                id TEXT PRIMARY KEY,
-                content TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-              )`
-            ).run();
-
             await env.DB.prepare(
               `INSERT INTO workspace_data (id, content, updated_at)
                VALUES (?1, ?2, CURRENT_TIMESTAMP)
