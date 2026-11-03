@@ -8,25 +8,23 @@ import {
   Trash2,
   Check,
   CheckCircle2,
-  Circle,
   RotateCcw,
   Sparkles,
   Sun,
   Moon,
   LogOut,
   ArrowLeft,
+  ArrowRight,
   Home,
   Cake,
   Cloud,
   CheckCheck,
   X,
   Share2,
-  Package,
-  Layers,
   ChevronDown,
   ChevronUp,
-  SlidersHorizontal,
-  Info
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { ShoppingCategory, ShoppingItem, ShoppingList } from '../types/shopping.ts';
@@ -39,7 +37,7 @@ interface ShoppingViewProps {
 
 const STORAGE_KEY = 'argon_shopping_lists_v1';
 
-// Category color and visual config
+// Category metadata: colors, icons, badge styles
 const CATEGORY_META: Record<ShoppingCategory, { color: string; badgeBg: string; border: string; icon: string }> = {
   'Meyve & Sebze': {
     color: 'text-emerald-700 dark:text-emerald-400',
@@ -147,16 +145,41 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   const [speechSupported, setSpeechSupported] = useState(true);
   const [showNewListModal, setShowNewListModal] = useState(false);
   const [newListName, setNewListName] = useState('');
-  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   const [showArchived, setShowArchived] = useState(true);
+  const [micError, setMicError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Synchronization and recognition refs
   const recognitionRef = useRef<any>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptRef = useRef<string>('');
+  const listsRef = useRef<ShoppingList[]>(lists);
+  const activeListIdRef = useRef<string>(activeListId);
+  const processInputRef = useRef<(rawText: string) => void>(() => {});
+
+  // Keep state refs updated to prevent stale closures
+  useEffect(() => {
+    listsRef.current = lists;
+  }, [lists]);
+
+  useEffect(() => {
+    activeListIdRef.current = activeListId;
+  }, [activeListId]);
 
   // Active Shopping List
   const activeList = useMemo(() => {
     return lists.find(l => l.id === activeListId) || lists[0] || null;
   }, [lists, activeListId]);
+
+  // Show Toast
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
 
   // Load from Cloud D1 on initial mount
   useEffect(() => {
@@ -169,7 +192,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       .then(data => {
         if (!isMounted || !Array.isArray(data)) return;
         setLists(data);
-        if (data.length > 0 && !activeListId) {
+        if (data.length > 0 && !activeListIdRef.current) {
           setActiveListId(data[0].id);
         }
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
@@ -207,6 +230,68 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     }, 1200);
   };
 
+  // Process text or speech into structured items
+  const handleProcessInput = (rawText: string) => {
+    const textToProcess = rawText.trim();
+    if (!textToProcess) return;
+
+    const parsedItems = parseSpeechOrTextInput(textToProcess);
+    if (parsedItems.length === 0) return;
+
+    const newItems: ShoppingItem[] = parsedItems.map(p =>
+      createShoppingItem(p.name, p.quantity, p.category)
+    );
+
+    const currentLists = listsRef.current;
+    const currentActiveId = activeListIdRef.current;
+    let targetList = currentLists.find(l => l.id === currentActiveId) || currentLists[0];
+
+    // If no list exists yet, automatically create one!
+    if (!targetList) {
+      const initialList: ShoppingList = {
+        id: 'list_' + Date.now(),
+        title: 'Alışveriş Listem',
+        items: newItems,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      const updated = [initialList, ...currentLists];
+      saveLists(updated);
+      setActiveListId(initialList.id);
+      setTextInput('');
+      setTranscript('');
+      transcriptRef.current = '';
+      const summary = newItems.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
+      showToast(`✅ "${initialList.title}" oluşturuldu ve ${newItems.length} ürün eklendi: ${summary}`);
+      return;
+    }
+
+    // Add new items to targetList
+    const updatedLists = currentLists.map(l => {
+      if (l.id === targetList.id) {
+        return {
+          ...l,
+          items: [...newItems, ...l.items],
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return l;
+    });
+
+    saveLists(updatedLists);
+    setTextInput('');
+    setTranscript('');
+    transcriptRef.current = '';
+
+    const summary = newItems.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
+    showToast(`✅ ${newItems.length} ürün eklendi: ${summary}`);
+  };
+
+  // Wire processInputRef for callbacks
+  useEffect(() => {
+    processInputRef.current = handleProcessInput;
+  });
+
   // Setup Web Speech API
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -222,20 +307,39 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       recognition.lang = 'tr-TR';
 
       recognition.onresult = (event: any) => {
-        let currentTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript;
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript + ' ';
         }
-        setTranscript(currentTranscript);
+        fullTranscript = fullTranscript.trim();
+        transcriptRef.current = fullTranscript;
+        setTranscript(fullTranscript);
+        // Live reflection in the text input so the user sees the words instantly!
+        setTextInput(fullTranscript);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         setIsListening(false);
+        if (event.error === 'not-allowed') {
+          setMicError('Tarayıcı mikrofon izni verilmedi. Lütfen adres çubuğundaki kilit simgesinden mikrofon iznini açın.');
+        } else if (event.error === 'no-speech') {
+          // Silence timeout, don't show error
+        } else {
+          setMicError(`Ses uyarısı: ${event.error}`);
+        }
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        // If there was speech spoken when recognition ended, automatically process it!
+        const spoken = transcriptRef.current.trim();
+        if (spoken) {
+          processInputRef.current(spoken);
+          transcriptRef.current = '';
+          setTranscript('');
+          setTextInput('');
+        }
       };
 
       recognitionRef.current = recognition;
@@ -252,69 +356,34 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       return;
     }
 
+    setMicError(null);
+
     if (isListening) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {}
       setIsListening(false);
-      if (transcript.trim()) {
-        handleProcessInput(transcript);
+      const spoken = transcriptRef.current.trim() || textInput.trim();
+      if (spoken) {
+        handleProcessInput(spoken);
+        transcriptRef.current = '';
         setTranscript('');
+        setTextInput('');
       }
     } else {
       setTranscript('');
+      setTextInput('');
+      transcriptRef.current = '';
       try {
         recognitionRef.current.start();
         setIsListening(true);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Mic start error:', err);
+        if (err.name !== 'InvalidStateError') {
+          setMicError('Mikrofon başlatılamadı. Lütfen mikrofon iznini kontrol edin.');
+        }
       }
     }
-  };
-
-  // Process text or speech into structured items
-  const handleProcessInput = (rawText: string) => {
-    if (!rawText.trim()) return;
-
-    if (!activeList) {
-      // If no list exists, create one automatically
-      const initialList: ShoppingList = {
-        id: 'list_' + Date.now(),
-        title: 'Alışveriş Listem',
-        items: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      const parsedItems = parseSpeechOrTextInput(rawText);
-      const newItems: ShoppingItem[] = parsedItems.map(p =>
-        createShoppingItem(p.name, p.quantity, p.category)
-      );
-      initialList.items = newItems;
-      const updated = [initialList, ...lists];
-      saveLists(updated);
-      setActiveListId(initialList.id);
-      setTextInput('');
-      return;
-    }
-
-    const parsedItems = parseSpeechOrTextInput(rawText);
-    if (parsedItems.length === 0) return;
-
-    const newItems: ShoppingItem[] = parsedItems.map(p =>
-      createShoppingItem(p.name, p.quantity, p.category)
-    );
-
-    const updatedLists = lists.map(l => {
-      if (l.id === activeList.id) {
-        return {
-          ...l,
-          items: [...newItems, ...l.items],
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return l;
-    });
-
-    saveLists(updatedLists);
-    setTextInput('');
   };
 
   // Toggle Completed Status (Moves item to bottom)
@@ -379,6 +448,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     setActiveListId(newList.id);
     setNewListName('');
     setShowNewListModal(false);
+    showToast(`✅ "${title}" listesi oluşturuldu!`);
   };
 
   // Delete Current List
@@ -470,13 +540,21 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(textLines);
-      alert('Alışveriş listesi panoya kopyalandı!');
+      showToast('📋 Alışveriş listesi panoya kopyalandı!');
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors selection:bg-purple-500/20 selection:text-purple-900">
       
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900/90 dark:bg-zinc-100 text-white dark:text-slate-900 font-semibold text-xs sm:text-sm shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
+          <Sparkles className="w-4 h-4 text-purple-400 dark:text-purple-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Header Navigation */}
       <header className="border-b border-slate-200/90 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-30 shadow-2xs">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
@@ -578,106 +656,119 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
 
         {/* 1. Lists Selector Bar & New List Button */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200/80 dark:border-zinc-800">
-          
-          {/* Lists Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-none">
-            {lists.map(list => {
-              const isActive = list.id === activeList?.id;
-              const uncompletedCount = list.items.filter(i => !i.completed).length;
-              return (
-                <button
-                  key={list.id}
-                  onClick={() => setActiveListId(list.id)}
-                  className={`px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shadow-2xs ${
-                    isActive
-                      ? 'bg-purple-600 text-white shadow-purple-600/20'
-                      : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'
-                  }`}
-                >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>{list.title}</span>
-                  {uncompletedCount > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                      isActive ? 'bg-purple-800/80 text-purple-100' : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
-                    }`}>
-                      {uncompletedCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+        {lists.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200/80 dark:border-zinc-800">
+            
+            {/* Lists Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-none">
+              {lists.map(list => {
+                const isActive = list.id === activeList?.id;
+                const uncompletedCount = list.items.filter(i => !i.completed).length;
+                return (
+                  <button
+                    key={list.id}
+                    onClick={() => setActiveListId(list.id)}
+                    className={`px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shadow-2xs ${
+                      isActive
+                        ? 'bg-purple-600 text-white shadow-purple-600/20'
+                        : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>{list.title}</span>
+                    {uncompletedCount > 0 && (
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                        isActive ? 'bg-purple-800/80 text-purple-100' : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                      }`}>
+                        {uncompletedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
 
-            {/* Create New List Button */}
-            <button
-              onClick={() => {
-                setNewListName('');
-                setShowNewListModal(true);
-              }}
-              className="px-3 py-1.5 rounded-2xl text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-dashed border-purple-300 dark:border-purple-800 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Yeni Liste</span>
-            </button>
-          </div>
-
-          {/* List Action Buttons (Share, Delete) */}
-          {activeList && (
-            <div className="flex items-center gap-1.5">
+              {/* Create New List Button */}
               <button
-                onClick={handleShareList}
-                title="Listeyi Paylaş / Kopyala"
-                className="p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer shadow-2xs"
+                onClick={() => {
+                  setNewListName('');
+                  setShowNewListModal(true);
+                }}
+                className="px-3 py-1.5 rounded-2xl text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-dashed border-purple-300 dark:border-purple-800 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
               >
-                <Share2 className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={handleDeleteCurrentList}
-                title="Bu Listeyi Sil"
-                className="p-2 text-rose-500 hover:text-rose-700 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer shadow-2xs"
-              >
-                <Trash2 className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
+                <span>Yeni Liste</span>
               </button>
             </div>
-          )}
-        </div>
+
+            {/* List Action Buttons (Share, Delete) */}
+            {activeList && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleShareList}
+                  title="Listeyi Paylaş / Kopyala"
+                  className="p-2 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer shadow-2xs"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={handleDeleteCurrentList}
+                  title="Bu Listeyi Sil"
+                  className="p-2 text-rose-500 hover:text-rose-700 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 2. Interactive Voice & Quick Input Card */}
         <div className="rounded-3xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs transition-all relative overflow-hidden">
           
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500" />
+              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Ürün Ekle (Sesli veya Yazılı)
+                Ürün Ekle (Sesle veya Yazarak)
               </h2>
             </div>
             <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-              Otomatik miktar &amp; kategori tanıma
+              Otomatik miktar &amp; reyon gruplama
             </span>
           </div>
 
           {/* Voice Pulse Animation Banner if recording */}
           {isListening && (
-            <div className="mb-3.5 p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/15 to-purple-500/10 border border-purple-500/30 flex items-center justify-between animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-3.5 h-3.5 rounded-full bg-rose-500 animate-ping" />
-                <div>
-                  <p className="text-xs font-bold text-purple-800 dark:text-purple-300">
-                    Sizi dinliyor... (Örn: "kahve 1 kg muz ve 2 ekmek")
+            <div className="mb-3.5 p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/15 via-indigo-500/20 to-purple-500/15 border-2 border-purple-500/40 flex items-center justify-between gap-3 animate-pulse">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-4 h-4 rounded-full bg-rose-500 shrink-0 animate-ping" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                    <span>Sizi dinliyor...</span>
+                    <span className="text-[11px] font-normal text-slate-500 dark:text-zinc-400 hidden sm:inline">(Konuşmanız bitince otomatik eklenir)</span>
                   </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-400 italic mt-0.5">
-                    {transcript || 'Konuşmaya başlayın...'}
+                  <p className="text-xs text-purple-700 dark:text-purple-300 font-medium truncate mt-0.5">
+                    {transcript || 'Konuşmaya başlayın (Örn: "kahve 1 kg muz 2 ekmek peynir")...'}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={toggleListening}
-                className="px-3 py-1 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs cursor-pointer shrink-0 flex items-center gap-1.5"
               >
-                Durdur &amp; Ekle
+                <Check className="w-3.5 h-3.5" />
+                <span>Tamamla &amp; Ekle</span>
               </button>
+            </div>
+          )}
+
+          {/* Microphone Permission Warning if any */}
+          {micError && (
+            <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>{micError}</span>
             </div>
           )}
 
@@ -698,7 +789,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               {isListening ? (
                 <>
                   <MicOff className="w-5 h-5 text-white animate-bounce" />
-                  <span className="hidden sm:inline text-xs">Bitir</span>
+                  <span className="hidden sm:inline text-xs font-bold">Bitir &amp; Ekle</span>
                 </>
               ) : (
                 <>
@@ -719,7 +810,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                     handleProcessInput(textInput);
                   }
                 }}
-                placeholder="Örn: 1 kg muz, kahve, 2 ekmek, deterjan..."
+                placeholder={isListening ? 'Konuşulanlar buraya yazılıyor...' : 'Örn: kahve, 1 kg muz, 2 ekmek, peynir...'}
                 className="w-full pl-3.5 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition-all"
               />
               {textInput && (
@@ -748,32 +839,85 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
           {/* Quick tips / examples */}
           <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
             <Info className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-            <span>Virgülle veya "ve" diyerek tek seferde onlarca ürün söyleyebilirsiniz. Sistem otomatik gruplar.</span>
+            <span>Mikrofona basıp art arda ürünleri söyleyin (Örn: <em>"kahve 1 kg muz 2 ekmek süt"</em>). Sistem otomatik reyonlara ayırır.</span>
           </div>
         </div>
 
         {/* 3. Empty State or Active List Details */}
-        {!activeList || activeList.items.length === 0 ? (
+        {lists.length === 0 ? (
+          /* FIRST TIME ONBOARDING CARD */
+          <div className="rounded-3xl border-2 border-purple-500/30 bg-white dark:bg-zinc-900 p-6 sm:p-10 text-center max-w-lg mx-auto shadow-xl shadow-purple-500/5">
+            <div className="w-16 h-16 rounded-3xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto mb-4 shadow-xs">
+              <ShoppingBag className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-2">
+              Alışverişe Başlayın
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-zinc-400 mb-6">
+              İlk alışveriş listenizin adını girin veya aşağıdaki hazır şablonlardan birini seçin:
+            </p>
+            <form onSubmit={handleCreateList} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Liste Adı
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Örn: Haftalık Market, Pazar Listesi..."
+                  value={newListName}
+                  onChange={e => setNewListName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+
+              {/* Quick Preset Chips */}
+              <div className="flex flex-wrap gap-2">
+                {['🛒 Haftalık Market', '🍏 Pazar Alışverişi', '🏠 Ev İhtiyaçları', '🍫 Atıştırmalıklar'].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setNewListName(preset.replace(/^[^\s]+\s+/, ''))}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/40 border border-slate-200 dark:border-zinc-700 transition-all cursor-pointer"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-purple-600/20 transition-all cursor-pointer flex items-center justify-center gap-2 mt-4"
+              >
+                <span>Listeyi Oluştur ve Başla</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        ) : !activeList || activeList.items.length === 0 ? (
+          /* ACTIVE LIST IS EMPTY CARD */
           <div className="rounded-3xl border-2 border-dashed border-slate-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-8 sm:p-12 text-center flex flex-col items-center justify-center gap-4">
             <div className="w-16 h-16 rounded-3xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-xs">
               <ShoppingCart className="w-8 h-8" />
             </div>
             <div className="max-w-md">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                {activeList ? `"${activeList.title}" Henüz Boş` : 'Henüz Bir Liste Yok'}
+                "{activeList?.title || 'Liste'}" Henüz Boş
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1">
-                Mikrofona basıp "kahve, 1 kg muz, 2 ekmek" deyin veya yukarıdaki kutuya yazıp ekleyin. Otomatik kategorilere ayrılacaktır.
+                Yukarıdaki mikrofona basıp <em>"kahve 1 kg muz 2 ekmek peynir"</em> diyerek tek seferde konuşun. Sistem otomatik reyonlarına ayıracaktır.
               </p>
             </div>
             
             {/* Quick preset suggestions */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
               <button
+                type="button"
                 onClick={() => handleProcessInput('1 kg muz, 2 ekmek, süt, çay, peynir, deterjan')}
                 className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 shadow-2xs transition-all cursor-pointer"
               >
-                + Temel Ev İhtiyaçları Örneği Yükle
+                + Temel Ev İhtiyaçları Örneği Ekle
               </button>
             </div>
           </div>

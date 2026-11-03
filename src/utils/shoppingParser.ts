@@ -71,11 +71,8 @@ function toTrLower(str: string): string {
  */
 export function detectCategory(name: string): ShoppingCategory {
   const lower = toTrLower(name);
-
-  // Split into words for strict matching on short words
   const words = lower.split(/[\s,.-]+/).filter(Boolean);
 
-  // Check categories in priority order (Personal Care & Cleaning before basic staples)
   const categoryOrder: ShoppingCategory[] = [
     'Kişisel Bakım',
     'Temizlik & Ev',
@@ -94,14 +91,11 @@ export function detectCategory(name: string): ShoppingCategory {
     const keywords = CATEGORY_KEYWORDS[category];
     for (const kw of keywords) {
       const lowerKw = toTrLower(kw);
-      // For multi-word keywords (e.g. "diş macunu", "ayçiçek yağı"), use substring check
       if (lowerKw.includes(' ')) {
         if (lower.includes(lowerKw)) return category;
       } else if (lowerKw.length <= 3) {
-        // For short keywords (e.g. "un", "et", "su", "çay", "bal", "yağ", "tuz"), require exact whole-word match
         if (words.includes(lowerKw)) return category;
       } else {
-        // For longer single words (>= 4 chars like "deterjan", "elma", "peynir"), check if any word starts with it or contains it
         if (words.some(w => w.startsWith(lowerKw) || w === lowerKw) || lower.includes(lowerKw)) {
           return category;
         }
@@ -114,19 +108,11 @@ export function detectCategory(name: string): ShoppingCategory {
 
 /**
  * Extracts quantity string and cleans up the item name
- * Examples:
- * "1 kg muz" -> { quantity: "1 kg", name: "Muz" }
- * "2 ekmek" -> { quantity: "2 adet", name: "Ekmek" }
- * "yarım kilo kıyma" -> { quantity: "yarım kilo", name: "Kıyma" }
- * "500 gr fıstık" -> { quantity: "500 gr", name: "Fıstık" }
- * "domates" -> { quantity: "1 kg", name: "Domates" } (or undefined)
  */
 export function extractQuantityAndName(raw: string): { name: string; quantity: string } {
   let text = raw.trim();
   let quantity = '';
 
-  // Patterns for Turkish quantities:
-  // e.g. "1.5 kg", "2 kilo", "500 gr", "250 gram", "3 paket", "2 adet", "1 tane", "1 demet", "1 litre", "yarım kilo", "1 şişe", "1 kutu", "1 koli"
   const qtyPatterns = [
     /^(yarım|çeyrek|bir buçuk)\s*(kilo|kg|litre|lt|ekmek|demet|paket)?/i,
     /^(\d+(?:[.,]\d+)?)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|poşet|bağ)\b/i,
@@ -136,20 +122,16 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
   for (const pattern of qtyPatterns) {
     const match = text.match(pattern);
     if (match) {
-      const matchedStr = match[0].trim();
-      quantity = matchedStr;
-      
-      // If it's just a raw number like "2", append "adet"
-      if (/^\d+(?:[.,]\d+)?$/.test(quantity)) {
-        quantity = `${quantity} adet`;
+      let matchedStr = match[0].trim();
+      if (/^\d+(?:[.,]\d+)?$/.test(matchedStr)) {
+        matchedStr = `${matchedStr} adet`;
       }
-
+      quantity = matchedStr;
       text = text.substring(match[0].length).trim();
       break;
     }
   }
 
-  // Also check suffix quantity e.g. "muz 1 kg" or "ekmek 2 adet"
   if (!quantity) {
     const suffixMatch = text.match(/\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|litre|lt|demet|şişe|kutu|koli)?|(?:yarım|çeyrek)\s*(?:kilo|kg|litre)?)$/i);
     if (suffixMatch) {
@@ -162,7 +144,6 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
     }
   }
 
-  // Capitalize first letter of item name
   let cleanName = text;
   if (cleanName.length > 0) {
     cleanName = cleanName.charAt(0).toLocaleUpperCase('tr-TR') + cleanName.slice(1);
@@ -178,27 +159,62 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
 
 /**
  * Splits continuous voice transcript or comma/line separated input into discrete shopping items.
- * Example: "kahve, 1 kg muz ve 2 paket makarna bir de tuvalet kağıdı"
+ * Handles continuous speech like "kahve 1 kg muz 2 ekmek yarım kilo peynir"
+ * as well as "elma armut muz" or "süt peynir yumurta"
  */
 export function parseSpeechOrTextInput(input: string): Array<{ name: string; quantity: string; category: ShoppingCategory }> {
   if (!input || !input.trim()) return [];
 
-  // Replace common Turkish speech conjunctions with commas
-  let normalized = input
+  let text = input.trim();
+
+  // 1. Replace spoken connectors ("ve", "ile", "bir de", "ayrıca", "dahil", "sonra") with commas
+  text = text
     .replace(/\b(ve|ile|bir de|ayrıca|dahil|sonra)\b/gi, ',')
     .replace(/[;\n\r]+/g, ',');
 
+  // 2. Insert comma before quantity keywords that start mid-sentence
+  // e.g. "kahve 1 kg muz" -> "kahve, 1 kg muz"
+  // e.g. "muz 2 ekmek" -> "muz, 2 ekmek"
+  // e.g. "domates yarım kilo peynir" -> "domates, yarım kilo peynir"
+  text = text.replace(/([^\s,]+)\s+((?:yarım|çeyrek|bir buçuk)\s*(?:kilo|kg|litre|ekmek|demet|paket)?)/gi, '$1, $2');
+  text = text.replace(/([^\s,]+)\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|bağ)\b)/gi, '$1, $2');
+  text = text.replace(/([^\s,]+)\s+(\d+(?:[.,]\d+)?\s+[a-zA-ZçğıöşüÇĞİÖŞÜ]+)/gi, '$1, $2');
+
   // Split by comma
-  const parts = normalized
+  let parts = text
     .split(',')
     .map(p => p.trim())
     .filter(p => p.length > 0);
 
-  const results: Array<{ name: string; quantity: string; category: ShoppingCategory }> = [];
+  // 3. For any remaining part that might still contain multiple space-separated known items (e.g. "elma armut muz")
+  const expandedParts: string[] = [];
+  
+  // Flatten all known single-word keywords
+  const allKnownKeywords = new Set<string>();
+  for (const list of Object.values(CATEGORY_KEYWORDS)) {
+    for (const kw of list) {
+      if (!kw.includes(' ') && kw.length >= 3) {
+        allKnownKeywords.add(toTrLower(kw));
+      }
+    }
+  }
 
   for (const part of parts) {
-    // If the part is long and contains multiple numbers, handle further sub-splitting
-    const { name, quantity } = extractQuantityAndName(part);
+    const words = part.split(/\s+/).filter(Boolean);
+    // If it's 2 or more words, has no quantity, but each word is a known grocery item (e.g. "elma armut muz" or "süt peynir")
+    const hasNumber = /\d|yarım|çeyrek|kilo|kg|paket|adet/i.test(part);
+    if (!hasNumber && words.length >= 2 && words.every(w => allKnownKeywords.has(toTrLower(w)))) {
+      // Split each word into its own item!
+      expandedParts.push(...words);
+    } else {
+      expandedParts.push(part);
+    }
+  }
+
+  const results: Array<{ name: string; quantity: string; category: ShoppingCategory }> = [];
+
+  for (const p of expandedParts) {
+    const { name, quantity } = extractQuantityAndName(p);
     if (!name) continue;
 
     const category = detectCategory(name);
