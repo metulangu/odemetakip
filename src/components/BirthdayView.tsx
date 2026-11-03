@@ -24,7 +24,8 @@ import {
   ChevronLeft,
   Check,
   User,
-  Filter
+  Filter,
+  ShoppingCart
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 
@@ -128,7 +129,7 @@ const DEFAULT_DEMO_PEOPLE: BirthdayPerson[] = [
 ];
 
 interface BirthdayViewProps {
-  onNavigate: (module: 'hub' | 'expenses') => void;
+  onNavigate: (module: 'hub' | 'expenses' | 'shopping') => void;
   onLogout: () => void;
 }
 
@@ -405,6 +406,17 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Gider Takibi</span>
+            </button>
+
+            {/* Quick Switch to Shopping */}
+            <button
+              type="button"
+              onClick={() => onNavigate('shopping')}
+              title="Alışveriş Listesine Geç"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 border border-purple-200/80 dark:border-purple-800 text-purple-700 dark:text-purple-300 transition-all cursor-pointer shadow-2xs"
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Alışveriş</span>
             </button>
 
             {/* Add Person Primary Button */}

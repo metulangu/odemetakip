@@ -8,6 +8,7 @@ import { FinanceProvider } from './context/FinanceContext.tsx';
 import { LoginView } from './components/LoginView.tsx';
 import { LoremHomeView } from './components/LoremHomeView.tsx';
 import { BirthdayView } from './components/BirthdayView.tsx';
+import { ShoppingView } from './components/ShoppingView.tsx';
 import { HubView } from './components/HubView.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 
@@ -21,7 +22,7 @@ function AppContent() {
     }
   });
 
-  const [currentModule, setCurrentModule] = useState<'hub' | 'expenses' | 'birthdays'>('hub');
+  const [currentModule, setCurrentModule] = useState<'hub' | 'expenses' | 'birthdays' | 'shopping'>('hub');
 
   const handleLogout = () => {
     try {
@@ -65,7 +66,17 @@ function AppContent() {
     );
   }
 
-  // 3. Best Home Expenses & Bills
+  // 3. Shopping List Module
+  if (currentModule === 'shopping') {
+    return (
+      <ShoppingView
+        onNavigate={(mod) => setCurrentModule(mod)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // 4. Best Home Expenses & Bills
   return (
     <LoremHomeView
       onLogout={handleLogout}

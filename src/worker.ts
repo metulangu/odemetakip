@@ -9,7 +9,13 @@ export default {
 
     // API Endpoint for Database Sync: /api/data
     if (url.pathname === '/api/data') {
-      const targetId = url.searchParams.get("key") === "birthdays" ? "birthdays_workspace" : "lorem_workspace";
+      const key = url.searchParams.get("key");
+      let targetId = "lorem_workspace";
+      if (key === "birthdays") {
+        targetId = "birthdays_workspace";
+      } else if (key === "shopping") {
+        targetId = "shopping_workspace";
+      }
 
       if (request.method === 'GET') {
         if (env.DB) {
