@@ -24,11 +24,12 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  AlertCircle
+  AlertCircle,
+  CopyX
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { ShoppingCategory, ShoppingItem, ShoppingList } from '../types/shopping.ts';
-import { parseSpeechOrTextInput, createShoppingItem } from '../utils/shoppingParser.ts';
+import { parseSpeechOrTextInput, createShoppingItem, removeRepeatedPhrases } from '../utils/shoppingParser.ts';
 
 interface ShoppingViewProps {
   onNavigate: (module: 'hub' | 'expenses' | 'birthdays') => void;
@@ -142,7 +143,6 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [textInput, setTextInput] = useState('');
-  const [speechSupported, setSpeechSupported] = useState(true);
   const [showNewListModal, setShowNewListModal] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [showArchived, setShowArchived] = useState(true);
@@ -156,7 +156,6 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   const transcriptRef = useRef<string>('');
   const listsRef = useRef<ShoppingList[]>(lists);
   const activeListIdRef = useRef<string>(activeListId);
-  const processInputRef = useRef<(rawText: string) => void>(() => {});
 
   // Keep state refs updated to prevent stale closures
   useEffect(() => {
@@ -230,17 +229,13 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     }, 1200);
   };
 
-  // Process text or speech into structured items
+  // Process text or speech into structured items with anti-duplication
   const handleProcessInput = (rawText: string) => {
     const textToProcess = rawText.trim();
     if (!textToProcess) return;
 
     const parsedItems = parseSpeechOrTextInput(textToProcess);
     if (parsedItems.length === 0) return;
-
-    const newItems: ShoppingItem[] = parsedItems.map(p =>
-      createShoppingItem(p.name, p.quantity, p.category)
-    );
 
     const currentLists = listsRef.current;
     const currentActiveId = activeListIdRef.current;
@@ -251,7 +246,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       const initialList: ShoppingList = {
         id: 'list_' + Date.now(),
         title: 'Alışveriş Listem',
-        items: newItems,
+        items: parsedItems.map(p => createShoppingItem(p.name, p.quantity, p.category)),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -261,8 +256,47 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       setTextInput('');
       setTranscript('');
       transcriptRef.current = '';
-      const summary = newItems.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
-      showToast(`✅ "${initialList.title}" oluşturuldu ve ${newItems.length} ürün eklendi: ${summary}`);
+      const summary = initialList.items.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
+      showToast(`✅ "${initialList.title}" oluşturuldu ve ${initialList.items.length} ürün eklendi: ${summary}`);
+      return;
+    }
+
+    // Check existing uncompleted items in targetList to prevent any duplicate additions!
+    const existingActiveMap = new Map<string, ShoppingItem>();
+    for (const item of targetList.items) {
+      if (!item.completed) {
+        existingActiveMap.set(item.name.toLocaleLowerCase('tr-TR'), item);
+      }
+    }
+
+    const itemsToAdd: ShoppingItem[] = [];
+    let updatedExistingItems = [...targetList.items];
+    let updatedCount = 0;
+
+    for (const p of parsedItems) {
+      const lower = p.name.toLocaleLowerCase('tr-TR');
+      if (existingActiveMap.has(lower)) {
+        // If it already exists in the active list, update its quantity if new quantity was specified!
+        const existingItem = existingActiveMap.get(lower)!;
+        if (p.quantity && p.quantity !== '1 adet' && existingItem.quantity !== p.quantity) {
+          updatedExistingItems = updatedExistingItems.map(i =>
+            i.id === existingItem.id ? { ...i, quantity: p.quantity } : i
+          );
+          updatedCount++;
+        }
+      } else {
+        // Brand new item
+        const newItem = createShoppingItem(p.name, p.quantity, p.category);
+        itemsToAdd.push(newItem);
+        existingActiveMap.set(lower, newItem);
+      }
+    }
+
+    if (itemsToAdd.length === 0 && updatedCount === 0) {
+      showToast('ℹ️ Söylenen ürünler zaten listenizde mevcut.');
+      setTextInput('');
+      setTranscript('');
+      transcriptRef.current = '';
       return;
     }
 
@@ -271,7 +305,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       if (l.id === targetList.id) {
         return {
           ...l,
-          items: [...newItems, ...l.items],
+          items: [...itemsToAdd, ...updatedExistingItems],
           updatedAt: new Date().toISOString()
         };
       }
@@ -283,20 +317,84 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     setTranscript('');
     transcriptRef.current = '';
 
-    const summary = newItems.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
-    showToast(`✅ ${newItems.length} ürün eklendi: ${summary}`);
+    const summary = (itemsToAdd.length > 0 ? itemsToAdd : parsedItems)
+      .map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`)
+      .join(', ');
+    showToast(`✅ ${itemsToAdd.length > 0 ? `${itemsToAdd.length} yeni ürün eklendi` : 'Miktarlar güncellendi'}: ${summary}`);
   };
 
-  // Wire processInputRef for callbacks
-  useEffect(() => {
-    processInputRef.current = handleProcessInput;
-  });
+  // Clean duplicate items in the active list (e.g. from previous voice glitches)
+  const handleCleanDuplicates = () => {
+    if (!activeList || activeList.items.length === 0) return;
 
-  // Setup Web Speech API
+    const seenActive = new Set<string>();
+    const seenCompleted = new Set<string>();
+    const cleanedItems: ShoppingItem[] = [];
+    let removedCount = 0;
+
+    for (const item of activeList.items) {
+      const lowerName = item.name.toLocaleLowerCase('tr-TR').trim();
+      if (item.completed) {
+        if (!seenCompleted.has(lowerName)) {
+          seenCompleted.add(lowerName);
+          cleanedItems.push(item);
+        } else {
+          removedCount++;
+        }
+      } else {
+        if (!seenActive.has(lowerName)) {
+          seenActive.add(lowerName);
+          cleanedItems.push(item);
+        } else {
+          removedCount++;
+        }
+      }
+    }
+
+    if (removedCount === 0) {
+      showToast('ℹ️ Listede yinelenen ürün bulunmuyor.');
+      return;
+    }
+
+    const updatedLists = lists.map(l => {
+      if (l.id === activeList.id) {
+        return {
+          ...l,
+          items: cleanedItems,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return l;
+    });
+
+    saveLists(updatedLists);
+    showToast(`🧹 ${removedCount} adet yinelenen ürün temizlendi!`);
+  };
+
+  // Clear all items in active list
+  const handleClearAllItems = () => {
+    if (!activeList || activeList.items.length === 0) return;
+    if (!window.confirm(`"${activeList.title}" listesindeki tüm ürünleri silmek istediğinize emin misiniz?`)) return;
+
+    const updatedLists = lists.map(l => {
+      if (l.id === activeList.id) {
+        return {
+          ...l,
+          items: [],
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return l;
+    });
+
+    saveLists(updatedLists);
+    showToast('🗑️ Liste tamamen boşaltıldı.');
+  };
+
+  // Setup Web Speech API (stable mobile setup)
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setSpeechSupported(false);
       return;
     }
 
@@ -311,10 +409,9 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
         for (let i = 0; i < event.results.length; i++) {
           fullTranscript += event.results[i][0].transcript + ' ';
         }
-        fullTranscript = fullTranscript.trim();
+        fullTranscript = removeRepeatedPhrases(fullTranscript.trim());
         transcriptRef.current = fullTranscript;
         setTranscript(fullTranscript);
-        // Live reflection in the text input so the user sees the words instantly!
         setTextInput(fullTranscript);
       };
 
@@ -324,7 +421,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
         if (event.error === 'not-allowed') {
           setMicError('Tarayıcı mikrofon izni verilmedi. Lütfen adres çubuğundaki kilit simgesinden mikrofon iznini açın.');
         } else if (event.error === 'no-speech') {
-          // Silence timeout, don't show error
+          // Silence timeout, ignore
         } else {
           setMicError(`Ses uyarısı: ${event.error}`);
         }
@@ -332,20 +429,12 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
 
       recognition.onend = () => {
         setIsListening(false);
-        // If there was speech spoken when recognition ended, automatically process it!
-        const spoken = transcriptRef.current.trim();
-        if (spoken) {
-          processInputRef.current(spoken);
-          transcriptRef.current = '';
-          setTranscript('');
-          setTextInput('');
-        }
+        // Do NOT automatically submit on speech pauses (prevents multi-add glitches)
       };
 
       recognitionRef.current = recognition;
     } catch (e) {
       console.warn('Could not initialize SpeechRecognition', e);
-      setSpeechSupported(false);
     }
   }, []);
 
@@ -454,11 +543,12 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   // Delete Current List
   const handleDeleteCurrentList = () => {
     if (!activeList) return;
-    if (!window.confirm(`"${activeList.title}" listesini silmek istediğinize emin misiniz?`)) return;
+    if (!window.confirm(`"${activeList.title}" listesini tamamen silmek istediğinize emin misiniz?`)) return;
 
     const remaining = lists.filter(l => l.id !== activeList.id);
     saveLists(remaining);
     setActiveListId(remaining.length > 0 ? remaining[0].id : '');
+    showToast('🗑️ Liste silindi.');
   };
 
   // Clear completed items
@@ -655,7 +745,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       {/* Main Content Area */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
 
-        {/* 1. Lists Selector Bar & New List Button */}
+        {/* 1. Lists Selector Bar & Action Toolbar */}
         {lists.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200/80 dark:border-zinc-800">
             
@@ -700,9 +790,31 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               </button>
             </div>
 
-            {/* List Action Buttons (Share, Delete) */}
+            {/* List Action Buttons (Share, Clean Duplicates, Clear All, Delete) */}
             {activeList && (
               <div className="flex items-center gap-1.5">
+                {/* Clean Duplicates Button */}
+                <button
+                  onClick={handleCleanDuplicates}
+                  title="Yinelenen Ürünleri Temizle"
+                  className="px-2.5 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-xl border border-purple-200 dark:border-purple-800/60 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                >
+                  <CopyX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Yinelenenleri Temizle</span>
+                </button>
+
+                {/* Clear All Items in list */}
+                {activeList.items.length > 0 && (
+                  <button
+                    onClick={handleClearAllItems}
+                    title="Bu Listenin İçini Tamamen Boşalt"
+                    className="p-2 text-slate-500 hover:text-amber-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Share List */}
                 <button
                   onClick={handleShareList}
                   title="Listeyi Paylaş / Kopyala"
@@ -711,6 +823,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                   <Share2 className="w-4 h-4" />
                 </button>
 
+                {/* Delete Entire List */}
                 <button
                   onClick={handleDeleteCurrentList}
                   title="Bu Listeyi Sil"
@@ -746,10 +859,10 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
                     <span>Sizi dinliyor...</span>
-                    <span className="text-[11px] font-normal text-slate-500 dark:text-zinc-400 hidden sm:inline">(Konuşmanız bitince otomatik eklenir)</span>
+                    <span className="text-[11px] font-normal text-slate-500 dark:text-zinc-400 hidden sm:inline">(Konuşmanız bitince Bitir &amp; Ekle'ye basın)</span>
                   </p>
                   <p className="text-xs text-purple-700 dark:text-purple-300 font-medium truncate mt-0.5">
-                    {transcript || 'Konuşmaya başlayın (Örn: "kahve 1 kg muz 2 ekmek peynir")...'}
+                    {transcript || 'Konuşmaya başlayın (Örn: "1 kg muz 2 kg kiraz 3 ekmek")...'}
                   </p>
                 </div>
               </div>
@@ -759,7 +872,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                 className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs cursor-pointer shrink-0 flex items-center gap-1.5"
               >
                 <Check className="w-3.5 h-3.5" />
-                <span>Tamamla &amp; Ekle</span>
+                <span>Bitir &amp; Ekle</span>
               </button>
             </div>
           )}
@@ -810,7 +923,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                     handleProcessInput(textInput);
                   }
                 }}
-                placeholder={isListening ? 'Konuşulanlar buraya yazılıyor...' : 'Örn: kahve, 1 kg muz, 2 ekmek, peynir...'}
+                placeholder={isListening ? 'Konuşulanlar buraya yazılıyor...' : 'Örn: 1 kg muz 2 kg kiraz 3 ekmek...'}
                 className="w-full pl-3.5 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition-all"
               />
               {textInput && (
@@ -839,7 +952,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
           {/* Quick tips / examples */}
           <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
             <Info className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-            <span>Mikrofona basıp art arda ürünleri söyleyin (Örn: <em>"kahve 1 kg muz 2 ekmek süt"</em>). Sistem otomatik reyonlara ayırır.</span>
+            <span>Mikrofona basıp sırayla söyleyin (Örn: <em>"1 kg muz 2 kg kiraz 3 ekmek"</em>). Bitince Bitir &amp; Ekle'ye basmanız yeterlidir.</span>
           </div>
         </div>
 
@@ -906,7 +1019,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                 "{activeList?.title || 'Liste'}" Henüz Boş
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1">
-                Yukarıdaki mikrofona basıp <em>"kahve 1 kg muz 2 ekmek peynir"</em> diyerek tek seferde konuşun. Sistem otomatik reyonlarına ayıracaktır.
+                Yukarıdaki mikrofona basıp <em>"1 kg muz 2 kg kiraz 3 ekmek"</em> diyerek söyleyin. Bitince Bitir &amp; Ekle'ye basarak tek seferde ekleyebilirsiniz.
               </p>
             </div>
             
