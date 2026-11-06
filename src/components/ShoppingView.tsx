@@ -25,11 +25,15 @@ import {
   ChevronUp,
   Info,
   AlertCircle,
-  CopyX
+  CopyX,
+  Loader2,
+  Key
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { ShoppingCategory, ShoppingItem, ShoppingList } from '../types/shopping.ts';
 import { parseSpeechOrTextInput, createShoppingItem, removeRepeatedPhrases } from '../utils/shoppingParser.ts';
+import { parseShoppingItemsWithGemini, hasGeminiApiKey } from '../services/geminiShopping.ts';
+import { GeminiApiKeyModal } from './GeminiApiKeyModal.tsx';
 
 interface ShoppingViewProps {
   onNavigate: (module: 'hub' | 'expenses' | 'birthdays') => void;
@@ -149,6 +153,11 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   const [micError, setMicError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Gemini AI States
+  const [showGeminiModal, setShowGeminiModal] = useState(false);
+  const [hasAiKey, setHasAiKey] = useState<boolean>(() => hasGeminiApiKey());
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+
   // Synchronization and recognition refs
   const recognitionRef = useRef<any>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -229,13 +238,31 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     }, 1200);
   };
 
-  // Process text or speech into structured items with anti-duplication
-  const handleProcessInput = (rawText: string) => {
+  // Process text or speech into structured items with anti-duplication & Gemini AI
+  const handleProcessInput = async (rawText: string) => {
     const textToProcess = rawText.trim();
-    if (!textToProcess) return;
+    if (!textToProcess || isAiProcessing) return;
 
-    const parsedItems = parseSpeechOrTextInput(textToProcess);
-    if (parsedItems.length === 0) return;
+    setIsAiProcessing(true);
+    let parsedItems: Array<{ name: string; quantity: string; category: ShoppingCategory }> = [];
+    let usedAi = false;
+
+    try {
+      const result = await parseShoppingItemsWithGemini(textToProcess);
+      parsedItems = result.items;
+      usedAi = result.usedAi;
+    } catch (e) {
+      console.warn('AI parsing error, falling back to local parser:', e);
+      parsedItems = parseSpeechOrTextInput(textToProcess);
+      usedAi = false;
+    } finally {
+      setIsAiProcessing(false);
+    }
+
+    if (parsedItems.length === 0) {
+      showToast('⚠️ Ürün anlaşılamadı. Lütfen tekrar deneyin.');
+      return;
+    }
 
     const currentLists = listsRef.current;
     const currentActiveId = activeListIdRef.current;
@@ -257,7 +284,8 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       setTranscript('');
       transcriptRef.current = '';
       const summary = initialList.items.map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`).join(', ');
-      showToast(`✅ "${initialList.title}" oluşturuldu ve ${initialList.items.length} ürün eklendi: ${summary}`);
+      const prefix = usedAi ? '✨ Gemini AI: ' : '✅ ';
+      showToast(`${prefix}"${initialList.title}" oluşturuldu ve ${initialList.items.length} ürün eklendi: ${summary}`);
       return;
     }
 
@@ -320,7 +348,8 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     const summary = (itemsToAdd.length > 0 ? itemsToAdd : parsedItems)
       .map(i => `${i.name}${i.quantity !== '1 adet' ? ` (${i.quantity})` : ''}`)
       .join(', ');
-    showToast(`✅ ${itemsToAdd.length > 0 ? `${itemsToAdd.length} yeni ürün eklendi` : 'Miktarlar güncellendi'}: ${summary}`);
+    const prefix = usedAi ? '✨ Gemini AI: ' : '✅ ';
+    showToast(`${prefix}${itemsToAdd.length > 0 ? `${itemsToAdd.length} yeni ürün eklendi` : 'Miktarlar güncellendi'}: ${summary}`);
   };
 
   // Clean duplicate items in the active list (e.g. from previous voice glitches)
@@ -717,6 +746,24 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               </span>
             </div>
 
+            {/* Gemini AI Status & Settings Pill */}
+            <button
+              type="button"
+              onClick={() => setShowGeminiModal(true)}
+              title={hasAiKey ? 'Gemini AI Aktif (Ayarları Aç / Değiştir)' : 'Gemini AI Bağla (Google AI Studio ile Ücretsiz)'}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                hasAiKey
+                  ? 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 hover:bg-purple-100 dark:hover:bg-purple-900/60'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25 ring-2 ring-purple-400/40'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${hasAiKey ? 'text-purple-600 dark:text-purple-400' : 'text-purple-100 animate-spin'}`} />
+              <span>
+                {hasAiKey ? 'Gemini AI' : 'Gemini Ekle'}
+              </span>
+              {hasAiKey && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+            </button>
+
             {/* Theme Toggle */}
             <button
               type="button"
@@ -839,17 +886,54 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
         {/* 2. Interactive Voice & Quick Input Card */}
         <div className="rounded-3xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs transition-all relative overflow-hidden">
           
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                 Ürün Ekle (Sesle veya Yazarak)
               </h2>
             </div>
-            <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-              Otomatik miktar &amp; reyon gruplama
-            </span>
+            
+            {/* Direct Gemini Settings Button */}
+            <button
+              type="button"
+              onClick={() => setShowGeminiModal(true)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                hasAiKey
+                  ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm shadow-purple-600/30 ring-2 ring-purple-400/30'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{hasAiKey ? '✨ Gemini AI: Aktif' : '✨ Gemini AI Anahtarı Ekle'}</span>
+            </button>
           </div>
+
+          {/* Prominent Gemini AI Onboarding Banner if not yet connected */}
+          {!hasAiKey && (
+            <div className="mb-3.5 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border-2 border-purple-500/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    Gemini AI Henüz Bağlanmadı
+                  </p>
+                  <p className="text-[11px] text-slate-600 dark:text-zinc-400 truncate">
+                    Google AI Studio ile günde 1.500 istek tamamen ücretsizdir.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGeminiModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                Ücretsiz Bağla
+              </button>
+            </div>
+          )}
 
           {/* Voice Pulse Animation Banner if recording */}
           {isListening && (
@@ -941,18 +1025,45 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
             <button
               type="button"
               onClick={() => handleProcessInput(textInput)}
-              disabled={!textInput.trim()}
+              disabled={!textInput.trim() || isAiProcessing}
               className="p-3 sm:px-4 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Ekle</span>
+              {isAiProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="hidden sm:inline">İşleniyor...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Ekle</span>
+                </>
+              )}
             </button>
           </div>
 
-          {/* Quick tips / examples */}
-          <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
-            <Info className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-            <span>Mikrofona basıp sırayla söyleyin (Örn: <em>"1 kg muz 2 kg kiraz 3 ekmek"</em>). Bitince Bitir &amp; Ekle'ye basmanız yeterlidir.</span>
+          {/* AI Processing status banner */}
+          {isAiProcessing && (
+            <div className="mt-3 p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-purple-500/30 flex items-center gap-2.5 text-xs text-purple-800 dark:text-purple-300 animate-pulse">
+              <Loader2 className="w-4 h-4 shrink-0 animate-spin text-purple-600 dark:text-purple-400" />
+              <span className="font-medium">✨ Gemini AI metni çözümlüyor ve ürünleri kategorilerine yerleştiriyor...</span>
+            </div>
+          )}
+
+          {/* Quick tips & Gemini AI link */}
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-zinc-400">
+            <div className="flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 shrink-0 text-purple-500" />
+              <span>Mikrofona basıp söyleyin veya yazın (Örn: <em>"1 kg muz 2 kg kiraz 3 ekmek"</em>).</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGeminiModal(true)}
+              className="font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>{hasAiKey ? 'Gemini AI Aktif' : 'Gemini AI Bağla (Ücretsiz)'}</span>
+            </button>
           </div>
         </div>
 
@@ -1313,6 +1424,16 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
           </div>
         </div>
       )}
+
+      {/* Gemini API Key Settings & Test Modal */}
+      <GeminiApiKeyModal
+        isOpen={showGeminiModal}
+        onClose={() => setShowGeminiModal(false)}
+        onKeySaved={(k) => {
+          setHasAiKey(!!k);
+          showToast(k ? '✨ Gemini AI aktifleştirildi!' : 'ℹ️ Gemini AI kaldırıldı, yerel ayrıştırıcı aktif.');
+        }}
+      />
 
     </div>
   );

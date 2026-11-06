@@ -1,11 +1,95 @@
 interface Env {
   ASSETS: { fetch: typeof fetch };
   DB?: any;
+  GEMINI_API_KEY?: string;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // API Endpoint for AI Shopping Parser: /api/ai/parse-shopping
+    if (url.pathname === '/api/ai/parse-shopping' && request.method === 'POST') {
+      try {
+        const apiKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY);
+        if (!apiKey) {
+          return new Response(JSON.stringify({ success: false, error: 'GEMINI_API_KEY not configured on server' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        const { input } = await request.json() as { input?: string };
+        if (!input || !input.trim()) {
+          return new Response(JSON.stringify({ success: true, items: [] }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        const validCategories = [
+          'Meyve & Sebze',
+          'Süt & Kahvaltılık',
+          'Temel Gıda & Bakliyat',
+          'Et, Tavuk & Balık',
+          'Fırın & Unlu Mamul',
+          'İçecekler',
+          'Atıştırmalık & Tatlı',
+          'Temizlik & Ev',
+          'Kişisel Bakım',
+          'Diğer'
+        ];
+
+        const prompt = `Sen Türkçe alışveriş listesi asistanısın. Kullanıcının söylediği veya yazdığı serbest metinden alışveriş ürünlerini ayıkla.
+Girdi: "${input.trim()}"
+
+Her ürün için name, quantity ve category içeren JSON dizisi döndür.`;
+
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    name: { type: 'STRING' },
+                    quantity: { type: 'STRING' },
+                    category: { type: 'STRING', enum: validCategories }
+                  },
+                  required: ['name', 'quantity', 'category']
+                }
+              }
+            }
+          })
+        });
+
+        if (!geminiRes.ok) {
+          const errText = await geminiRes.text();
+          return new Response(JSON.stringify({ success: false, error: errText }), {
+            status: 502,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        const geminiData = await geminiRes.json();
+        const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const items = text ? JSON.parse(text) : [];
+
+        return new Response(JSON.stringify({ success: true, items }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err.message || 'Server error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     // API Endpoint for Database Sync: /api/data
     if (url.pathname === '/api/data') {
