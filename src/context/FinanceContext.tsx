@@ -247,7 +247,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (email === 'mturkey11@gmail.com') {
             return { ...parsed, role: 'ADMIN', status: 'APPROVED' };
           }
-          if (email === 'meryemmehmetturhan@gmail.com') {
+          if (email === 'meryemmehmetturhan@gmail.com' || email === 'meryemmehmetturkey@gmail.com') {
             return { ...parsed, status: 'APPROVED' };
           }
           return parsed;
@@ -593,7 +593,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const cleanEmail = email.trim().toLowerCase();
     const displayName = (name || cleanEmail.split('@')[0] || 'Kullanıcı').trim();
     const isAdminEmail = cleanEmail === 'mturkey11@gmail.com';
-    const isAutoApproved = isAdminEmail || cleanEmail === 'meryemmehmetturhan@gmail.com';
+    const isAutoApproved =
+      isAdminEmail ||
+      cleanEmail === 'meryemmehmetturhan@gmail.com' ||
+      cleanEmail === 'meryemmehmetturkey@gmail.com';
 
     let targetUser: User | undefined;
 

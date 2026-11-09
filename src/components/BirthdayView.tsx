@@ -33,7 +33,8 @@ import {
   isMainFamilyAccount,
   getBirthdayStorageKey,
   getApiDataUrl,
-  createNewUserStarterBirthdays
+  createNewUserStarterBirthdays,
+  MAIN_FAMILY_BIRTHDAYS
 } from '../utils/userStorage.ts';
 
 export interface BirthdayPerson {
@@ -128,13 +129,7 @@ function calculateBirthdayDetails(person: BirthdayPerson, refDate = new Date()) 
   };
 }
 
-const DEFAULT_DEMO_PEOPLE: BirthdayPerson[] = [
-  { id: 'bd-1', fullName: 'Meryem Yılmaz', birthDay: 18, birthMonth: 3, birthYear: 1993, category: 'Aile', phone: '05551234567', notes: 'Özel pasta ve hediye', createdAt: '2026-01-01' },
-  { id: 'bd-2', fullName: 'Azra Yılmaz', birthDay: 12, birthMonth: 7, birthYear: 2018, category: 'Aile', phone: '', notes: 'Oyuncak ve kutlama', createdAt: '2026-01-01' },
-  { id: 'bd-3', fullName: 'Mehmet Demir', birthDay: 24, birthMonth: 10, birthYear: 1990, category: 'Aile', phone: '05559876543', notes: 'Akşam yemeği', createdAt: '2026-01-01' },
-  { id: 'bd-4', fullName: 'Ahmet Kaya', birthDay: 5, birthMonth: 11, birthYear: 1988, category: 'Arkadaş', phone: '05441112233', notes: 'Grup kutlaması', createdAt: '2026-01-01' },
-  { id: 'bd-5', fullName: 'Fatma Teyze', birthDay: 15, birthMonth: 12, birthYear: 1965, category: 'Akraba', phone: '05324445566', notes: 'Telefonla ara', createdAt: '2026-01-01' }
-];
+const DEFAULT_DEMO_PEOPLE: BirthdayPerson[] = MAIN_FAMILY_BIRTHDAYS;
 
 interface BirthdayViewProps {
   onNavigate: (module: 'hub' | 'expenses' | 'shopping') => void;
@@ -153,10 +148,17 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
       const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Eğer aile hesabıysa ve eski sahte demo isimleri kalmışsa, gerçek 20 kişilik aile listesini geri getir
+          const hasFakeData = parsed.some((p: any) => p.fullName === 'Meryem Yılmaz' || p.fullName === 'Mehmet Demir');
+          if (isFamily && hasFakeData) {
+            return MAIN_FAMILY_BIRTHDAYS;
+          }
+          return parsed;
+        }
       }
     } catch {}
-    return isFamily ? DEFAULT_DEMO_PEOPLE : createNewUserStarterBirthdays();
+    return isFamily ? MAIN_FAMILY_BIRTHDAYS : createNewUserStarterBirthdays();
   });
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'calendar' | 'all'>('upcoming');

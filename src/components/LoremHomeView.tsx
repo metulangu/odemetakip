@@ -51,7 +51,8 @@ import {
   isMainFamilyAccount, 
   getExpenseStorageKey, 
   getApiDataUrl, 
-  createNewUserStarterExpenses 
+  createNewUserStarterExpenses,
+  getMainFamilyInitialExpenses
 } from '../utils/userStorage.ts';
 
 export interface LoremYearData {
@@ -292,58 +293,7 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
 }
 
 function createInitialDemoState(): LoremState {
-  const seedYear = 2026;
-  
-  // Kullanıcının talebi:
-  // Ocak'tan Ekim'e kadar 10 ay: hepsi 0 ₺ ve ödendi (paid: true)
-  // Kasım ve Aralık: 0 ₺ ve bekliyor (paid: false), Kasım'dan devam edilecek
-  const defaultAmounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const defaultPaid = [true, true, true, true, true, true, true, true, true, true, false, false];
-
-  const rawItems = [
-    { id: 'item-1', name: 'Kira', category: 'Sabit', dueDay: 1 },
-    { id: 'item-2', name: 'Elektrik', category: 'Fatura', dueDay: 15 },
-    { id: 'item-3', name: 'Su', category: 'Fatura', dueDay: 20 },
-    { id: 'item-4', name: 'Doğalgaz', category: 'Fatura', dueDay: 24 },
-    { id: 'item-5', name: 'Yakıt', category: 'Ulaşım', dueDay: 10 },
-    { id: 'item-6', name: 'Tel Mehmet', category: 'İletişim', dueDay: 18 },
-    { id: 'item-7', name: 'Tel Meryem', category: 'İletişim', dueDay: 18 },
-    { id: 'item-8', name: 'Tel Azra', category: 'İletişim', dueDay: 18 },
-    { id: 'item-9', name: 'TV İnternet', category: 'İletişim', dueDay: 12 },
-    { id: 'item-10', name: 'Kredi Kartı Mehmet', category: 'Finans', dueDay: 22 },
-    { id: 'item-11', name: 'Kredi Kartı Meryem', category: 'Finans', dueDay: 25 },
-    { id: 'item-12', name: 'Bakıcı', category: 'Sabit', dueDay: 5 },
-    { id: 'item-13', name: 'Site Aidatı', category: 'Sabit', dueDay: 30 }
-  ];
-
-  const items: LoremItem[] = rawItems.map(raw => ({
-    id: raw.id,
-    name: raw.name,
-    category: raw.category,
-    dueDay: raw.dueDay,
-    years: {
-      [seedYear]: {
-        amounts: [...defaultAmounts],
-        paid: [...defaultPaid],
-        notes: {}
-      }
-    },
-    amounts: [...defaultAmounts],
-    paid: [...defaultPaid],
-    notes: {}
-  }));
-
-  return {
-    version: 3,
-    workspaceTitle: 'Best Home',
-    selectedYear: seedYear,
-    selectedMonth: 10, // Kasım 2026 (0-indexed: 10)
-    viewMode: 'monthly',
-    activeCategoryFilter: 'Tümü',
-    quickAddCategory: 'Sabit',
-    categories: DEFAULT_CATEGORIES,
-    items
-  };
+  return getMainFamilyInitialExpenses();
 }
 
 /**
@@ -478,7 +428,12 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
       const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed.items)) {
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          // Eğer aile hesabıysa ve eski listede Yakıt varsa, gerçek 12 faturayı yükle
+          const hasOldYakit = parsed.items.some((it: any) => it.name === 'Yakıt');
+          if (isFamily && hasOldYakit) {
+            return getMainFamilyInitialExpenses();
+          }
           return sanitize2026Data(parsed);
         }
       }
@@ -500,9 +455,9 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
       // fallback
     }
 
-    // Ana aile için mevcut demo verileri, diğer onaylı kullanıcılar için temiz ve bağımsız başlangıç verisi
+    // Ana aile için gerçek faturalar, diğer onaylı kullanıcılar için temiz ve bağımsız başlangıç verisi
     const fresh = isFamily
-      ? createInitialDemoState()
+      ? getMainFamilyInitialExpenses()
       : createNewUserStarterExpenses(currentUser?.name);
 
     try {
