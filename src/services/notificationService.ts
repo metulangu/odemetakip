@@ -49,6 +49,29 @@ export function getNotificationPermissionState(): NotificationPermission | 'unsu
 }
 
 /**
+ * Requests permission to show native phone/browser notifications (Flalingo & Duagu style)
+ */
+export async function autoPromptPhoneNotification(): Promise<NotificationPermission | 'unsupported'> {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') {
+    await registerNotificationServiceWorker();
+    return 'granted';
+  }
+  if (Notification.permission === 'default') {
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        await registerNotificationServiceWorker();
+      }
+      return perm;
+    } catch {
+      return Notification.permission;
+    }
+  }
+  return Notification.permission;
+}
+
+/**
  * Requests permission to show native phone/browser notifications
  */
 export async function requestPhoneNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
@@ -78,40 +101,56 @@ export async function sendNativePhoneNotification(
   if (typeof window === 'undefined' || !('Notification' in window)) return false;
   if (Notification.permission !== 'granted') return false;
 
+  const options: any = {
+    body,
+    icon: '/icon-192.png',
+    badge: '/favicon-32x32.png',
+    tag,
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 150, 300, 150, 400],
+    data: { url: '/', module }
+  };
+
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/sw.js');
+      }
+      await navigator.serviceWorker.ready;
       if (reg && 'showNotification' in reg) {
-        await reg.showNotification(title, {
-          body,
-          icon: '/apple-touch-icon.png',
-          badge: '/favicon-32x32.png',
-          tag,
-          renotify: true,
-          vibrate: [200, 100, 200],
-          data: { url: '/', module }
-        } as any);
+        await reg.showNotification(title, options);
         return true;
       }
     }
 
     // Fallback to standard Notification constructor
-    new Notification(title, {
-      body,
-      icon: '/apple-touch-icon.png',
-      tag
-    });
+    const n = new Notification(title, options);
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
     return true;
   } catch (err) {
     console.warn('Native notification error:', err);
-    return false;
+    try {
+      const n = new Notification(title, options);
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
 /**
  * Computes active Expense notifications:
  * Starts 3 days before dueDay (3 gün kaldı, 2 gün kaldı, 1 gün kaldı, Bugün son!)
- * Continues 3 days after dueDay (-1, -2, -3 gün gecikti) until marked Ödendi (paid = true).
+ * Continues after dueDay (1 gün geçti, 2 gün geçti... kişi 'Ödendi' yapana kadar!).
  */
 export function computeExpenseNotifications(state: LoremState | null, now = new Date()): AppNotificationItem[] {
   if (!state || !Array.isArray(state.items)) return [];
@@ -120,7 +159,7 @@ export function computeExpenseNotifications(state: LoremState | null, now = new 
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
 
-  // Check current month and adjacent months (for month boundaries, e.g. 1st of month checking late days of previous month)
+  // Check current month and adjacent months (for month boundaries and overdue bills from previous months)
   const periods: Array<{ year: number; month: number }> = [
     {
       year: currentMonth === 0 ? currentYear - 1 : currentYear,
@@ -141,7 +180,7 @@ export function computeExpenseNotifications(state: LoremState | null, now = new 
     for (const item of state.items) {
       const yearData = getItemYearData(item, period.year);
       const isPaid = !!(yearData.paid && yearData.paid[period.month]);
-      if (isPaid) continue; // Kişi ödendi yaptıysa bildirim atma!
+      if (isPaid) continue; // Kişi ödendi yaptıysa bildirim durur!
 
       const safeDueDay = Math.min(31, Math.max(1, item.dueDay || 15));
       const clampedDay = Math.min(safeDueDay, maxDaysInMonth);
@@ -150,8 +189,8 @@ export function computeExpenseNotifications(state: LoremState | null, now = new 
       const diffTime = targetDate.getTime() - today.getTime();
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-      // 3 gün önceden başlayarak (3, 2, 1, 0) ve geçince de 3 gün boyunca (-1, -2, -3)
-      if (diffDays >= -3 && diffDays <= 3) {
+      // 3 gün önceden başlayarak (3, 2, 1, 0) ve sonrasında ödendi yapılana kadar devam eder
+      if (diffDays <= 3 && diffDays >= -60) {
         let title = '';
         let message = '';
         let severity: 'urgent' | 'warning' | 'info' = 'warning';
@@ -168,17 +207,25 @@ export function computeExpenseNotifications(state: LoremState | null, now = new 
           message = `${item.name} faturası/ödemesi${amountStr} için son 2 gün kaldı.`;
           severity = 'warning';
         } else if (diffDays === 1) {
-          title = `⚠️ ${item.name} ödemesine 1 gün kaldı!`;
+          title = `⚠️ ${item.name} ödemesine 1 gün kaldı (Yarın)!`;
           message = `${item.name} ödemesi${amountStr} için yarın son gün!`;
           severity = 'warning';
         } else if (diffDays === 0) {
           title = `🚨 ${item.name} — BUGÜN SON GÜN!`;
           message = `${item.name} ödemesi${amountStr} için bugün son ödeme günü! Ödeme yaptıysanız 'Ödendi' işaretleyin.`;
           severity = 'urgent';
-        } else if (diffDays < 0) {
+        } else if (diffDays === -1) {
+          title = `❗ ${item.name} ödemesi 1 gün geçti!`;
+          message = `${item.name} faturası${amountStr} son ödeme gününü 1 gün geçti ve henüz 'Ödendi' yapılmadı.`;
+          severity = 'urgent';
+        } else if (diffDays === -2) {
+          title = `❗ ${item.name} ödemesi 2 gün geçti!`;
+          message = `${item.name} faturası${amountStr} son ödeme gününü 2 gün geçti ve henüz 'Ödendi' yapılmadı.`;
+          severity = 'urgent';
+        } else if (diffDays < -2) {
           const lateDays = Math.abs(diffDays);
-          title = `❗ ${item.name} ödemesi ${lateDays} gün gecikti!`;
-          message = `${item.name} ödemesi${amountStr} son ödeme tarihini ${lateDays} gün geçti ve henüz 'Ödendi' işaretlenmedi.`;
+          title = `🚨 ${item.name} ödemesi ${lateDays} gün geçti!`;
+          message = `${item.name} faturası${amountStr} son ödeme tarihini ${lateDays} gün geçti ve bekliyor. Ödediyseniz 'Ödendi' işaretleyin.`;
           severity = 'urgent';
         }
 
@@ -280,7 +327,8 @@ export async function triggerDailyPhoneNotifications(items: AppNotificationItem[
   if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission !== 'granted' || items.length === 0) return;
 
-  const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   let log: Record<string, string> = {};
   try {
     const saved = localStorage.getItem(NOTIFIED_LOG_KEY);

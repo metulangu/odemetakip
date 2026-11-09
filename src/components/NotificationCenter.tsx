@@ -298,7 +298,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                     Harika! Bekleyen Bildirim Yok
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                    Yaklaşan (3 gün kala) veya geciken (3 gün boyunca) ödenmemiş faturanız ya da onaylanmamış doğum günü bildiriminiz bulunmuyor.
+                    Yaklaşan (3 gün kala) veya geciken ödenmemiş faturanız ya da kutlanmamış doğum günü bildiriminiz bulunmuyor.
                   </p>
                 </div>
               ) : (
@@ -371,7 +371,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                             className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>Ödendi İşaretle (Durdur)</span>
+                            <span>Ödendi İşaretle (Bildirimi Durdur)</span>
                           </button>
                         ) : (
                           <button
@@ -380,7 +380,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                             className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>Tamam, Haberim Var</span>
+                            <span>🎉 Kutlandı (Tamam)</span>
                           </button>
                         )}
                       </div>
@@ -393,7 +393,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
             {/* Footer Info */}
             <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
               <span>
-                💡 Ödemeler <strong>Ödendi</strong> yapılana, doğum günleri <strong>Tamam, Haberim Var</strong> denilene kadar bildirim verir.
+                💡 Faturalar <strong>Ödendi</strong> yapılana, doğum günleri <strong>Kutlandı (Tamam)</strong> denilene kadar telefona bildirim verir.
               </span>
             </div>
           </div>

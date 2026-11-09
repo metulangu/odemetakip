@@ -852,15 +852,15 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
                             </span>
                           )}
 
-                          {/* 3 gün ve daha az kaldığında "Tamam, Haberim Var" butonu */}
+                          {/* 3 gün ve daha az kaldığında "Kutlandı / Tamam" butonu */}
                           {diffDays <= 3 && (
                             <button
                               type="button"
                               onClick={() => handleToggleAcknowledge(p, p.stats.nextDate.getFullYear())}
                               title={
                                 p.acknowledgedYear === p.stats.nextDate.getFullYear()
-                                  ? 'Bildirim susturuldu. Tekrar açmak için tıklayın.'
-                                  : 'Bildirimi durdurmak için Tamam, Haberim Var olarak işaretleyin'
+                                  ? 'Kutlandı olarak işaretlendi (Bildirim durduruldu). Tekrar açmak için tıklayın.'
+                                  : 'Doğum günü kutlandı / bildirimleri durdurmak için tıklayın'
                               }
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer border ${
                                 p.acknowledgedYear === p.stats.nextDate.getFullYear()
@@ -871,8 +871,8 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
                               <Check className="w-3.5 h-3.5" />
                               <span>
                                 {p.acknowledgedYear === p.stats.nextDate.getFullYear()
-                                  ? 'Haberim Var İşaretlendi'
-                                  : 'Tamam, Haberim Var'}
+                                  ? '✓ Kutlandı / Tamam'
+                                  : '🎉 Kutlandı (Tamam)'}
                               </span>
                             </button>
                           )}
