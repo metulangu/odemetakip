@@ -68,47 +68,47 @@ function toTrLower(str: string): string {
 
 /**
  * Removes repeated words and duplicate consecutive phrases caused by mobile speech engines
- * e.g. "bir bir kilo muz bir kilo muz" -> "bir kilo muz"
+ * Using Turkish-safe whitespace boundaries instead of ASCII \b
  */
 export function removeRepeatedPhrases(text: string): string {
   let prev = '';
   let curr = text.trim();
-  let maxLoop = 6;
+  let maxLoop = 4;
   while (prev !== curr && maxLoop-- > 0) {
     prev = curr;
-    // Remove immediate duplicate single words: "bir bir" -> "bir"
-    curr = curr.replace(/\b([a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+)\s+\1\b/gi, '$1');
-    // Remove duplicate multi-word sequences (up to 5 words)
-    curr = curr.replace(/\b([a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+(?:\s+[a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+){1,5})\s+\1\b/gi, '$1');
+    // Remove immediate duplicate single words using whitespace boundary (safe for Turkish letters)
+    curr = curr.replace(/(^|\s+)([a-zA-ZçğıöşüÇĞİÖŞÜ0-9]{2,})\s+\2(?=\s+|$|[.,;])/gi, '$1$2');
   }
   return curr;
 }
 
 /**
- * Converts Turkish spoken number words to numeric digits when used as quantities
- * e.g. "bir kilo muz iki kilo kiraz üç ekmek" -> "1 kilo muz 2 kilo kiraz 3 ekmek"
+ * Converts Turkish spoken number words to numeric digits ONLY when clearly followed by a unit
+ * (e.g. "iki kilo", "üç paket") to prevent turning normal words into numbers.
  */
 export function normalizeTurkishSpokenNumbers(text: string): string {
   let res = text;
 
-  // Multi-word numbers
+  const unitPattern = '(?:kilo|kg|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|bağ)';
+
+  // Multi-word numbers before units
   const multiWords: Record<string, number> = {
     'iki yüz elli': 250, 'beş yüz': 500, 'on beş': 15, 'on iki': 12, 'on bir': 11, 'yirmi beş': 25
   };
   for (const [mw, val] of Object.entries(multiWords)) {
-    res = res.replace(new RegExp(`\\b${mw}\\b`, 'gi'), String(val));
+    const reg = new RegExp(`(^|[\\s,.;])${mw}\\s+(?=${unitPattern}(?:$|[\\s,.;]))`, 'gi');
+    res = res.replace(reg, `$1${val} `);
   }
 
-  // Single word numbers
+  // Single word numbers ONLY when followed by an explicit unit
   const singleNumbers: Record<string, number> = {
     'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
     'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
   };
 
   for (const [sw, val] of Object.entries(singleNumbers)) {
-    // Only replace if followed by another word, excluding Turkish particles like "de", "da", "gibi", "kadar"
-    const reg = new RegExp(`\\b${sw}\\s+(?!(?:de|da|kadar|gibi)\\b)([a-zA-ZçğıöşüÇĞİÖŞÜ]+)`, 'gi');
-    res = res.replace(reg, `${val} $1`);
+    const reg = new RegExp(`(^|[\\s,.;])${sw}\\s+(?=${unitPattern}(?:$|[\\s,.;]))`, 'gi');
+    res = res.replace(reg, `$1${val} `);
   }
 
   return res;
@@ -157,15 +157,29 @@ export function detectCategory(name: string): ShoppingCategory {
 /**
  * Extracts quantity string and cleans up the item name
  */
-export function extractQuantityAndName(raw: string): { name: string; quantity: string } {
+export function extractQuantityAndName(raw: string, ignoreQuantities = false): { name: string; quantity: string } {
   let text = raw.trim();
   let quantity = '';
 
+  if (ignoreQuantities) {
+    // Strip any leading/trailing numbers or unit words so only pure product name remains
+    text = text
+      .replace(/^(\d+(?:[.,]\d+)?|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|yarım|çeyrek)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|poşet|bağ)?\s*/gi, '')
+      .replace(/\s+(\d+(?:[.,]\d+)?)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli)?$/gi, '')
+      .trim();
+
+    let cleanName = text || raw.trim();
+    if (cleanName.length > 0) {
+      cleanName = cleanName.charAt(0).toLocaleUpperCase('tr-TR') + cleanName.slice(1);
+    }
+    return { name: cleanName, quantity: '1 adet' };
+  }
+
   const qtyPatterns = [
-    /^(yarım|çeyrek|bir buçuk)\s*(kilo|kg|litre|lt|ekmek|demet|paket)?/i,
-    /^(\d+(?:[.,]\d+)?)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|poşet|bağ)\b/i,
-    /^(bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|bağ)\b/i,
-    /^(\d+(?:[.,]\d+)?)\s+/i // e.g. "2 ekmek" -> "2 adet"
+    /^(yarım|çeyrek|bir buçuk)\s*(kilo|kg|litre|lt|ekmek|demet|paket)?(?=\s+|$)/i,
+    /^(\d+(?:[.,]\d+)?)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|poşet|bağ)(?=\s+|$)/i,
+    /^(bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)\s*(kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|dilim|bağ)(?=\s+|$)/i,
+    /^(\d+(?:[.,]\d+)?)\s+/i
   ];
 
   for (const pattern of qtyPatterns) {
@@ -182,7 +196,7 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
   }
 
   if (!quantity) {
-    const suffixMatch = text.match(/\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|litre|lt|demet|şişe|kutu|koli)?|(?:yarım|çeyrek)\s*(?:kilo|kg|litre)?)$/i);
+    const suffixMatch = text.match(/\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|litre|lt|demet|şişe|kutu|koli)|(?:yarım|çeyrek)\s*(?:kilo|kg|litre))$/i);
     if (suffixMatch) {
       let matchedSuffix = suffixMatch[1].trim();
       if (/^\d+(?:[.,]\d+)?$/.test(matchedSuffix)) {
@@ -193,8 +207,7 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
     }
   }
 
-  // Also clean any leftover leading "1 adet" or "1 kg" mistakenly left in text
-  text = text.replace(/^(bir|1)\s*(kilo|kg)\s*/i, '');
+  text = text.replace(/^(bir|1)\s*(kilo|kg|adet|tane)\s*/i, '');
 
   let cleanName = text;
   if (cleanName.length > 0) {
@@ -211,27 +224,31 @@ export function extractQuantityAndName(raw: string): { name: string; quantity: s
 
 /**
  * Splits continuous voice transcript or comma/line separated input into discrete shopping items.
- * Handles continuous speech like "1 kg muz 2 kg kiraz 3 ekmek"
- * Deduplicates multiple items with identical names in the same speech batch.
  */
-export function parseSpeechOrTextInput(input: string): Array<{ name: string; quantity: string; category: ShoppingCategory }> {
+export function parseSpeechOrTextInput(
+  input: string,
+  ignoreQuantities = false
+): Array<{ name: string; quantity: string; category: ShoppingCategory }> {
   if (!input || !input.trim()) return [];
 
   // Step 1: Remove repeated word sequences from mobile speech glitches
   let text = removeRepeatedPhrases(input);
 
-  // Step 2: Normalize spoken Turkish numbers like "bir kilo", "iki ekmek", "üç kiraz" -> "1 kilo", "2 ekmek", "3 kiraz"
-  text = normalizeTurkishSpokenNumbers(text);
+  // Step 2: Normalize spoken Turkish numbers only when followed by explicit units
+  if (!ignoreQuantities) {
+    text = normalizeTurkishSpokenNumbers(text);
+  }
 
-  // Step 3: Replace spoken connectors ("ve", "ile", "bir de", "ayrıca", "dahil", "sonra") with commas
+  // Step 3: Replace spoken connectors ("ve", "ile", "bir de", "ayrıca", "dahil", "sonra") with commas (Turkish-safe boundary)
   text = text
-    .replace(/\b(ve|ile|bir de|ayrıca|dahil|sonra)\b/gi, ',')
+    .replace(/(^|\s+)(ve|ile|bir de|ayrıca|dahil|sonra)(?=\s+|$)/gi, ',')
     .replace(/[;\n\r]+/g, ',');
 
-  // Step 4: Insert comma before quantity keywords that start mid-sentence
-  text = text.replace(/([^\s,]+)\s+((?:yarım|çeyrek|bir buçuk)\s*(?:kilo|kg|litre|ekmek|demet|paket)?)/gi, '$1, $2');
-  text = text.replace(/([^\s,]+)\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|bağ)\b)/gi, '$1, $2');
-  text = text.replace(/([^\s,]+)\s+(\d+(?:[.,]\d+)?\s+[a-zA-ZçğıöşüÇĞİÖŞÜ]+)/gi, '$1, $2');
+  if (!ignoreQuantities) {
+    // Step 4: Insert comma before quantity keywords that start mid-sentence
+    text = text.replace(/([^\s,]+)\s+((?:yarım|çeyrek|bir buçuk)\s*(?:kilo|kg|litre|ekmek|demet|paket)?)/gi, '$1, $2');
+    text = text.replace(/([^\s,]+)\s+(\d+(?:[.,]\d+)?\s*(?:kg|kilo|gr|gram|adet|tane|paket|pkt|litre|lt|demet|şişe|kutu|koli|bağ)(?=\s+|$))/gi, '$1, $2');
+  }
 
   // Split by comma
   let parts = text
@@ -254,7 +271,7 @@ export function parseSpeechOrTextInput(input: string): Array<{ name: string; qua
   for (const part of parts) {
     const words = part.split(/\s+/).filter(Boolean);
     const hasNumber = /\d|yarım|çeyrek|kilo|kg|paket|adet/i.test(part);
-    if (!hasNumber && words.length >= 2 && words.every(w => allKnownKeywords.has(toTrLower(w)))) {
+    if ((ignoreQuantities || !hasNumber) && words.length >= 2 && words.every(w => allKnownKeywords.has(toTrLower(w)))) {
       expandedParts.push(...words);
     } else {
       expandedParts.push(part);
@@ -262,15 +279,13 @@ export function parseSpeechOrTextInput(input: string): Array<{ name: string; qua
   }
 
   const results: Array<{ name: string; quantity: string; category: ShoppingCategory }> = [];
-  // Use a seen map to guarantee batch-level uniqueness!
   const seenNames = new Set<string>();
 
   for (const p of expandedParts) {
-    const { name, quantity } = extractQuantityAndName(p);
+    const { name, quantity } = extractQuantityAndName(p, ignoreQuantities);
     if (!name) continue;
 
     const lowerName = toTrLower(name);
-    // If exact name already seen in this batch, update or skip duplicate
     if (seenNames.has(lowerName)) {
       continue;
     }

@@ -34,6 +34,7 @@ import { ShoppingCategory, ShoppingItem, ShoppingList } from '../types/shopping.
 import { parseSpeechOrTextInput, createShoppingItem, removeRepeatedPhrases } from '../utils/shoppingParser.ts';
 import { parseShoppingItemsWithGemini, hasGeminiApiKey } from '../services/geminiShopping.ts';
 import { GeminiApiKeyModal } from './GeminiApiKeyModal.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
 
 interface ShoppingViewProps {
   onNavigate: (module: 'hub' | 'expenses' | 'birthdays') => void;
@@ -120,7 +121,7 @@ const CATEGORIES_LIST: ShoppingCategory[] = [
 ];
 
 export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout }) => {
-  const { theme, toggleTheme } = useFinance();
+  const { theme, toggleTheme, currentUser } = useFinance();
 
   // State: Multiple Shopping Lists
   const [lists, setLists] = useState<ShoppingList[]>(() => {
@@ -153,13 +154,23 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
   const [micError, setMicError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Sadece Ürün Adı Modu (Adet/Kg/Tane Yoksay - varsayılan aktif)
+  const [ignoreQuantities, setIgnoreQuantities] = useState<boolean>(true);
+
   // Gemini AI States
   const [showGeminiModal, setShowGeminiModal] = useState(false);
-  const [hasAiKey, setHasAiKey] = useState<boolean>(() => hasGeminiApiKey());
+  const [hasAiKey, setHasAiKey] = useState<boolean>(() => hasGeminiApiKey(currentUser?.email));
   const [isAiProcessing, setIsAiProcessing] = useState(false);
+
+  useEffect(() => {
+    setHasAiKey(hasGeminiApiKey(currentUser?.email));
+  }, [currentUser?.email]);
 
   // Synchronization and recognition refs
   const recognitionRef = useRef<any>(null);
+  const shouldKeepListeningRef = useRef<boolean>(false);
+  const accumulatedFinalRef = useRef<string>('');
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<string>('');
@@ -248,12 +259,15 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     let usedAi = false;
 
     try {
-      const result = await parseShoppingItemsWithGemini(textToProcess);
+      const result = await parseShoppingItemsWithGemini(textToProcess, undefined, {
+        ignoreQuantities,
+        userEmail: currentUser?.email
+      });
       parsedItems = result.items;
       usedAi = result.usedAi;
     } catch (e) {
       console.warn('AI parsing error, falling back to local parser:', e);
-      parsedItems = parseSpeechOrTextInput(textToProcess);
+      parsedItems = parseSpeechOrTextInput(textToProcess, ignoreQuantities);
       usedAi = false;
     } finally {
       setIsAiProcessing(false);
@@ -420,12 +434,26 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     showToast('🗑️ Liste tamamen boşaltıldı.');
   };
 
-  // Setup Web Speech API (stable mobile setup)
+  // Setup Web Speech API (stable mobile setup with extended 15s silence tolerance)
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       return;
     }
+
+    const resetSilenceTimer = () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      // 15 saniye boyunca hiç ses gelmezse mikrofonu güvenli şekilde kapat
+      silenceTimerRef.current = setTimeout(() => {
+        if (shouldKeepListeningRef.current) {
+          shouldKeepListeningRef.current = false;
+          try {
+            recognitionRef.current?.stop();
+          } catch {}
+          setIsListening(false);
+        }
+      }, 15000);
+    };
 
     try {
       const recognition = new SpeechRecognition();
@@ -434,37 +462,78 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       recognition.lang = 'tr-TR';
 
       recognition.onresult = (event: any) => {
-        let fullTranscript = '';
+        resetSilenceTimer();
+
+        let sessionFinal = '';
+        let sessionInterim = '';
         for (let i = 0; i < event.results.length; i++) {
-          fullTranscript += event.results[i][0].transcript + ' ';
+          const piece = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            sessionFinal += piece + ' ';
+          } else {
+            sessionInterim += piece + ' ';
+          }
         }
-        fullTranscript = removeRepeatedPhrases(fullTranscript.trim());
-        transcriptRef.current = fullTranscript;
-        setTranscript(fullTranscript);
-        setTextInput(fullTranscript);
+
+        // Eğer tarayıcı kısa sessizlikte yeniden başladıysa önceki kesinleşmiş metni koru
+        const combined = removeRepeatedPhrases(
+          `${accumulatedFinalRef.current} ${sessionFinal} ${sessionInterim}`.replace(/\s+/g, ' ').trim()
+        );
+
+        // Sadece bu oturumdaki final sonuçları güncellemek için sakla
+        if (sessionFinal.trim()) {
+          recognition._lastSessionFinal = sessionFinal.trim();
+        }
+
+        transcriptRef.current = combined;
+        setTranscript(combined);
+        setTextInput(combined);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
-        setIsListening(false);
         if (event.error === 'not-allowed') {
+          shouldKeepListeningRef.current = false;
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          setIsListening(false);
           setMicError('Tarayıcı mikrofon izni verilmedi. Lütfen adres çubuğundaki kilit simgesinden mikrofon iznini açın.');
-        } else if (event.error === 'no-speech') {
-          // Silence timeout, ignore
+        } else if (event.error === 'no-speech' || event.error === 'aborted') {
+          // Kısa sessizlikte tarayıcı no-speech verebilir; 15sn dolmadıysa onend içinde otomatik devam edecek
         } else {
           setMicError(`Ses uyarısı: ${event.error}`);
         }
       };
 
       recognition.onend = () => {
+        // Oturum kapanırken kesinleşmiş metin varsa biriktir
+        if (recognition._lastSessionFinal) {
+          accumulatedFinalRef.current = removeRepeatedPhrases(
+            `${accumulatedFinalRef.current} ${recognition._lastSessionFinal}`.replace(/\s+/g, ' ').trim()
+          );
+          recognition._lastSessionFinal = '';
+        }
+
+        // Kullanıcı "Bitir & Ekle" demediyse ve 15sn sessizlik süresi dolmadıysa mikrofonu açık tut!
+        if (shouldKeepListeningRef.current) {
+          try {
+            recognition.start();
+            return;
+          } catch {
+            // Tekrar başlatılamadıysa kapat
+          }
+        }
         setIsListening(false);
-        // Do NOT automatically submit on speech pauses (prevents multi-add glitches)
       };
 
       recognitionRef.current = recognition;
     } catch (e) {
       console.warn('Could not initialize SpeechRecognition', e);
     }
+
+    return () => {
+      shouldKeepListeningRef.current = false;
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
   }, []);
 
   // Toggle Voice Recording
@@ -477,6 +546,8 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     setMicError(null);
 
     if (isListening) {
+      shouldKeepListeningRef.current = false;
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       try {
         recognitionRef.current.stop();
       } catch {}
@@ -485,6 +556,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       if (spoken) {
         handleProcessInput(spoken);
         transcriptRef.current = '';
+        accumulatedFinalRef.current = '';
         setTranscript('');
         setTextInput('');
       }
@@ -492,13 +564,33 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       setTranscript('');
       setTextInput('');
       transcriptRef.current = '';
+      accumulatedFinalRef.current = '';
+      if (recognitionRef.current) {
+        recognitionRef.current._lastSessionFinal = '';
+      }
+      shouldKeepListeningRef.current = true;
+
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (shouldKeepListeningRef.current) {
+          shouldKeepListeningRef.current = false;
+          try {
+            recognitionRef.current?.stop();
+          } catch {}
+          setIsListening(false);
+        }
+      }, 15000);
+
       try {
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err: any) {
         console.error('Mic start error:', err);
         if (err.name !== 'InvalidStateError') {
+          shouldKeepListeningRef.current = false;
           setMicError('Mikrofon başlatılamadı. Lütfen mikrofon iznini kontrol edin.');
+        } else {
+          setIsListening(true);
         }
       }
     }
@@ -735,6 +827,13 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               <span className="hidden sm:inline">Doğum Günü</span>
             </button>
 
+            {/* Notification Center */}
+            <NotificationCenter
+              onNavigate={(mod) => {
+                if (mod !== 'shopping') onNavigate(mod);
+              }}
+            />
+
             {/* Cloud Status Pill */}
             <div 
               title={cloudStatus === 'synced' ? 'Bulut Senkronize (D1)' : cloudStatus === 'syncing' ? 'Kaydediliyor...' : 'Çevrimdışı'}
@@ -894,19 +993,46 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               </h2>
             </div>
             
-            {/* Direct Gemini Settings Button */}
-            <button
-              type="button"
-              onClick={() => setShowGeminiModal(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                hasAiKey
-                  ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm shadow-purple-600/30 ring-2 ring-purple-400/30'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{hasAiKey ? '✨ Gemini AI: Aktif' : '✨ Gemini AI Anahtarı Ekle'}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quantity Ignore Mode Toggle */}
+              <button
+                type="button"
+                onClick={() => setIgnoreQuantities(!ignoreQuantities)}
+                title={ignoreQuantities ? 'Şu an Sadece Ürün Adı Modu aktif (Adet/Kg/Sayı yoksayılır, yanlış anlaşılmalar engellenir)' : 'Miktarlı Mod aktif (Söylenen kilo/adet bilgisi algılanır)'}
+                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  ignoreQuantities
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80'
+                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${ignoreQuantities ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span>{ignoreQuantities ? 'Sadece Ürün Adı (Adet/Kg Yoksay)' : 'Miktarlı Mod (Kg/Adet Algıla)'}</span>
+              </button>
+
+              {/* Direct Gemini Settings Button */}
+              <button
+                type="button"
+                onClick={() => setShowGeminiModal(true)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                  hasAiKey
+                    ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm shadow-purple-600/30 ring-2 ring-purple-400/30'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{hasAiKey ? '✨ Gemini AI: Aktif' : '✨ Gemini AI Anahtarı Ekle'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Voice Guidance Warning Banner */}
+          <div className="mb-3 px-3 py-2 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 flex items-start sm:items-center justify-between gap-2 text-[11px] text-amber-900 dark:text-amber-200">
+            <div className="flex items-start sm:items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                <strong>Sesli Ekleme Uyarısı:</strong> En hatasız sonuç için <strong>adet, kilo, litre, tane demeden sadece ürün adını</strong> söyleyin (Örn: <em>"domates salatalık vişne çikolata süt ekmek"</em>). Düşünürken duraksasanız bile mikrofon <strong>15 saniye</strong> boyunca kapanmaz!
+              </span>
+            </div>
           </div>
 
           {/* Prominent Gemini AI Onboarding Banner if not yet connected */}
@@ -1007,7 +1133,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
                     handleProcessInput(textInput);
                   }
                 }}
-                placeholder={isListening ? 'Konuşulanlar buraya yazılıyor...' : 'Örn: 1 kg muz 2 kg kiraz 3 ekmek...'}
+                placeholder={isListening ? 'Konuşulanlar buraya yazılıyor (15sn sessizlik toleranslı)...' : (ignoreQuantities ? 'Sadece ürün adlarını söyleyin/yazın: domates salatalık vişne çikolata...' : 'Örn: 1 kg muz 2 kg kiraz 3 ekmek...')}
                 className="w-full pl-3.5 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition-all"
               />
               {textInput && (

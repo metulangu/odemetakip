@@ -45,6 +45,7 @@ import {
   LayoutGrid,
   ShoppingCart
 } from 'lucide-react';
+import { NotificationCenter } from './NotificationCenter.tsx';
 
 export interface LoremYearData {
   amounts: number[];
@@ -534,6 +535,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
         setData(sanitized);
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+          window.dispatchEvent(new Event('besthome-data-updated'));
         } catch {}
 
         // Buluttaki veri eski veya v3 değilse, temizlenmiş güncel hali buluta kaydet
@@ -550,7 +552,23 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
         setCloudSyncStatus('offline');
       });
 
-    return () => { active = false; };
+    const handleExternalUpdate = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.items)) {
+            setData(parsed);
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener('besthome-data-updated', handleExternalUpdate);
+
+    return () => {
+      active = false;
+      window.removeEventListener('besthome-data-updated', handleExternalUpdate);
+    };
   }, []);
 
   // Persist state & debounce sync to Cloudflare D1
@@ -560,6 +578,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
     // 1. Yerel Hafızaya Anında Kaydet (Offline-first)
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextData));
+      window.dispatchEvent(new Event('besthome-data-updated'));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
@@ -1098,6 +1117,17 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 <span className="hidden md:inline">Alışveriş</span>
               </button>
             )}
+
+            {/* Notification Center */}
+            <NotificationCenter
+              onNavigate={
+                onSwitchModule
+                  ? (mod) => {
+                      if (mod !== 'expenses') onSwitchModule(mod);
+                    }
+                  : undefined
+              }
+            />
 
             {/* View Mode Segmented Control: Monthly, Matrix, and Analytics */}
             <div className="inline-flex p-0.5 sm:p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/70 dark:border-zinc-700/60">

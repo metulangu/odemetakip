@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext.tsx';
-import { X, CheckCircle2, ShieldOff, Shield, Search, UserCheck } from 'lucide-react';
+import { X, CheckCircle2, ShieldOff, Shield, Search, UserCheck, Sparkles } from 'lucide-react';
+import { isPrivilegedGeminiUser } from '../services/geminiShopping.ts';
 
 interface AdminUsersModalProps {
   isOpen: boolean;
@@ -15,8 +16,9 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   const filteredUsers = allUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(filterQuery.toLowerCase()) ||
-                          user.email.toLowerCase().includes(filterQuery.toLowerCase());
+    const matchesSearch =
+      user.name.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(filterQuery.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || user.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -33,16 +35,16 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
             <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                Kullanıcı ve Yetki Yönetimi
+                Admin Paneli — Kullanıcı ve Yetki Yönetimi
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Google ile giriş yapan kullanıcıların onay ve rol denetimi
+                Google ile giriş yapan kullanıcıların tek seferlik onay ve rol denetimi (Admin: mturkey11@gmail.com)
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -65,7 +67,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
           <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded ${
+              className={`px-2.5 py-1 text-xs font-semibold rounded cursor-pointer ${
                 statusFilter === 'ALL' 
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs' 
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -75,7 +77,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
             </button>
             <button
               onClick={() => setStatusFilter('PENDING')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1.5 cursor-pointer ${
                 statusFilter === 'PENDING' 
                   ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold' 
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -90,7 +92,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
             </button>
             <button
               onClick={() => setStatusFilter('APPROVED')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded ${
+              className={`px-2.5 py-1 text-xs font-semibold rounded cursor-pointer ${
                 statusFilter === 'APPROVED' 
                   ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold' 
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -109,7 +111,8 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
             </div>
           ) : (
             filteredUsers.map(user => {
-              const isSelf = user.id === currentUser.id;
+              const isSelf = currentUser ? user.id === currentUser.id : false;
+              const isVipAi = isPrivilegedGeminiUser(user.email);
               return (
                 <div
                   key={user.id}
@@ -128,17 +131,22 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
                       className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 object-cover shrink-0"
                     />
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-slate-900 dark:text-white">{user.name}</span>
                         {isSelf && (
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-mono border border-slate-200 dark:border-slate-700">
                             Sen
                           </span>
                         )}
+                        {isVipAi && (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded font-bold border border-purple-200 dark:border-purple-800">
+                            <Sparkles className="w-2.5 h-2.5" /> Kalıcı Gemini API
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{user.email}</div>
                       <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        Kayıt: {user.createdAt}
+                        Kayıt: {user.createdAt} {!isVipAi && '• Kendi Gemini API anahtarını kullanır'}
                       </div>
                     </div>
                   </div>
@@ -149,7 +157,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
                     <button
                       disabled={isSelf}
                       onClick={() => changeUserRole(user.id, user.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
-                      className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
+                      className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors cursor-pointer ${
                         user.role === 'ADMIN'
                           ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
@@ -167,14 +175,14 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => approveUser(user.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Onayla</span>
+                          <span>Kalıcı Onayla</span>
                         </button>
                         <button
                           onClick={() => blockUser(user.id)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-600/20 dark:hover:bg-red-600/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30 text-xs font-semibold rounded-lg transition-all"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-600/20 dark:hover:bg-red-600/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer"
                         >
                           <ShieldOff className="w-3.5 h-3.5" />
                           <span>Engelle</span>
@@ -190,7 +198,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
                         {!isSelf && (
                           <button
                             onClick={() => blockUser(user.id)}
-                            className="text-xs text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                            className="text-xs text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             title="Erişimi Engelle"
                           >
                             <ShieldOff className="w-4 h-4" />
@@ -206,7 +214,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
                         </span>
                         <button
                           onClick={() => approveUser(user.id)}
-                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20"
+                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 cursor-pointer"
                         >
                           Kilidi Aç
                         </button>
@@ -221,10 +229,10 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({ isOpen, onClos
 
         {/* Modal Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>Toplam {allUsers.length} kayıtlı Google kullanıcısı</span>
+          <span>Toplam {allUsers.length} kayıtlı kullanıcı</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg font-semibold transition-colors"
+            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg font-semibold transition-colors cursor-pointer"
           >
             Kapat
           </button>

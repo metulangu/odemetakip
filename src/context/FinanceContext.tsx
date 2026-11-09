@@ -55,6 +55,7 @@ interface FinanceContextType {
   changeUserRole: (userId: string, role: 'ADMIN' | 'MEMBER') => void;
   switchUser: (user: User) => void;
   addNewMockUser: (email: string, name: string) => void;
+  loginWithGoogle: (email: string, name?: string, avatar?: string) => User;
   resetAllData: () => void;
 }
 
@@ -65,17 +66,50 @@ const STORAGE_KEY_USERS = 'argon_finance_users_v2';
 const STORAGE_KEY_ACTIVE_USER = 'argon_finance_active_user_v2';
 const STORAGE_KEY_THEME = 'argon_finance_theme_v2';
 
+export const ADMIN_EMAIL = 'mturkey11@gmail.com';
+export const VIP_GEMINI_EMAILS = ['mturkey11@gmail.com', 'meryemmehmetturhan@gmail.com'];
+
 const INITIAL_USERS: User[] = [
   {
-    id: 'user-admin',
-    email: 'admin@argon.local',
-    name: 'Admin',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
+    id: 'user-admin-mturkey11',
+    email: 'mturkey11@gmail.com',
+    name: 'Mehmet Turhan (Admin)',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mturkey11',
     role: 'ADMIN',
     status: 'APPROVED',
     createdAt: '2025-01-01',
   },
+  {
+    id: 'user-vip-meryem',
+    email: 'meryemmehmetturhan@gmail.com',
+    name: 'Meryem Turhan',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=meryem',
+    role: 'MEMBER',
+    status: 'APPROVED',
+    createdAt: '2025-01-01',
+  },
 ];
+
+function ensureCoreUsers(users: User[]): User[] {
+  const map = new Map<string, User>();
+  for (const u of users) {
+    if (u && u.email) {
+      map.set(u.email.toLowerCase().trim(), u);
+    }
+  }
+  for (const core of INITIAL_USERS) {
+    const email = core.email.toLowerCase().trim();
+    const existing = map.get(email);
+    if (!existing) {
+      map.set(email, core);
+    } else if (email === 'mturkey11@gmail.com') {
+      map.set(email, { ...existing, role: 'ADMIN', status: 'APPROVED' });
+    } else if (email === 'meryemmehmetturhan@gmail.com') {
+      map.set(email, { ...existing, status: 'APPROVED' });
+    }
+  }
+  return Array.from(map.values());
+}
 
 const INITIAL_ITEMS: ExpenseItem[] = [
   { id: 'exp-1', name: 'Ofis Kirası (Merkez)', category: 'KIRA', defaultDueDay: 1, isActive: true, order: 1, notes: 'Ataşehir Finans Merkezi Ofis Kirası' },
@@ -188,7 +222,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [allUsers, setAllUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USERS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return ensureCoreUsers(parsed);
+      }
     } catch (e) {
       console.warn('Failed loading users from storage', e);
     }
@@ -201,14 +238,60 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
       if (savedActive) {
         const parsed = JSON.parse(savedActive);
-        const match = INITIAL_USERS.find(u => u.id === parsed.id);
-        if (match) return match;
+        if (parsed && parsed.email) {
+          const email = parsed.email.toLowerCase().trim();
+          if (email === 'mturkey11@gmail.com') {
+            return { ...parsed, role: 'ADMIN', status: 'APPROVED' };
+          }
+          if (email === 'meryemmehmetturhan@gmail.com') {
+            return { ...parsed, status: 'APPROVED' };
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.warn('Failed loading active user', e);
     }
     return INITIAL_USERS[0]; // Admin by default
   });
+
+  // Sync users from Cloudflare D1 on mount & poll if currentUser is PENDING
+  useEffect(() => {
+    let active = true;
+    const fetchCloudUsers = () => {
+      fetch('/api/data?key=users')
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (!active || !Array.isArray(data)) return;
+          const merged = ensureCoreUsers(data);
+          setAllUsers(merged);
+          setCurrentUser(curr => {
+            const match = merged.find(u => u.email.toLowerCase().trim() === curr.email.toLowerCase().trim());
+            return match ? match : curr;
+          });
+        })
+        .catch(() => {});
+    };
+
+    fetchCloudUsers();
+    const interval = setInterval(fetchCloudUsers, 6000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const syncUsersToCloud = useCallback((usersToSync: User[]) => {
+    const cleaned = ensureCoreUsers(usersToSync);
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(cleaned));
+    } catch {}
+    fetch('/api/data?key=users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleaned)
+    }).catch(() => {});
+  }, []);
 
   // Load items
   const [items, setItems] = useState<ExpenseItem[]>(() => {
@@ -467,37 +550,106 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Admin user approvals
   const approveUser = useCallback((userId: string) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'APPROVED' } : u));
+    setAllUsers(prev => {
+      const updated = prev.map(u => u.id === userId ? { ...u, status: 'APPROVED' as const } : u);
+      syncUsersToCloud(updated);
+      return updated;
+    });
     setCurrentUser(curr => curr.id === userId ? { ...curr, status: 'APPROVED' } : curr);
-  }, []);
+  }, [syncUsersToCloud]);
 
   const blockUser = useCallback((userId: string) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'BLOCKED' } : u));
-    setCurrentUser(curr => curr.id === userId ? { ...curr, status: 'BLOCKED' } : curr);
-  }, []);
+    setAllUsers(prev => {
+      const updated = prev.map(u => {
+        if (u.id === userId && u.email.toLowerCase() !== 'mturkey11@gmail.com') {
+          return { ...u, status: 'BLOCKED' as const };
+        }
+        return u;
+      });
+      syncUsersToCloud(updated);
+      return updated;
+    });
+    setCurrentUser(curr => (curr.id === userId && curr.email.toLowerCase() !== 'mturkey11@gmail.com') ? { ...curr, status: 'BLOCKED' } : curr);
+  }, [syncUsersToCloud]);
 
   const changeUserRole = useCallback((userId: string, role: 'ADMIN' | 'MEMBER') => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+    setAllUsers(prev => {
+      const updated = prev.map(u => u.id === userId ? { ...u, role } : u);
+      syncUsersToCloud(updated);
+      return updated;
+    });
     setCurrentUser(curr => curr.id === userId ? { ...curr, role } : curr);
-  }, []);
+  }, [syncUsersToCloud]);
 
   const switchUser = useCallback((user: User) => {
     setCurrentUser(user);
   }, []);
 
-  const addNewMockUser = useCallback((email: string, name: string) => {
-    const newUser: User = {
+  const loginWithGoogle = useCallback((email: string, name?: string, avatar?: string): User => {
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = (name || cleanEmail.split('@')[0] || 'Kullanıcı').trim();
+    const isAdminEmail = cleanEmail === 'mturkey11@gmail.com';
+    const isAutoApproved = isAdminEmail || cleanEmail === 'meryemmehmetturhan@gmail.com';
+
+    let targetUser: User | undefined;
+
+    setAllUsers(prev => {
+      const existing = prev.find(u => u.email.toLowerCase().trim() === cleanEmail);
+      let updated: User[];
+
+      if (existing) {
+        targetUser = {
+          ...existing,
+          name: name?.trim() ? name.trim() : existing.name,
+          avatar: avatar || existing.avatar,
+          role: isAdminEmail ? 'ADMIN' : existing.role,
+          status: isAutoApproved ? 'APPROVED' : existing.status,
+        };
+        updated = prev.map(u => u.id === existing.id ? targetUser! : u);
+      } else {
+        targetUser = {
+          id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          email: cleanEmail,
+          name: displayName,
+          avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanEmail)}`,
+          role: isAdminEmail ? 'ADMIN' : 'MEMBER',
+          status: isAutoApproved ? 'APPROVED' : 'PENDING',
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+        updated = [...prev, targetUser];
+      }
+
+      syncUsersToCloud(updated);
+      return updated;
+    });
+
+    const finalUser: User = targetUser || {
       id: `user-${Date.now()}`,
-      email,
-      name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
-      role: 'MEMBER',
-      status: 'PENDING', // New users always pending admin approval
+      email: cleanEmail,
+      name: displayName,
+      avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanEmail)}`,
+      role: isAdminEmail ? 'ADMIN' : 'MEMBER',
+      status: isAutoApproved ? 'APPROVED' : 'PENDING',
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setAllUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
-  }, []);
+
+    setCurrentUser(finalUser);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(finalUser));
+      localStorage.setItem('argon_auth_session', JSON.stringify({
+        email: finalUser.email,
+        username: finalUser.name,
+        role: finalUser.role,
+        authenticatedAt: new Date().toISOString()
+      }));
+    } catch {}
+
+    return finalUser;
+  }, [syncUsersToCloud]);
+
+  const addNewMockUser = useCallback((email: string, name: string) => {
+    loginWithGoogle(email, name);
+  }, [loginWithGoogle]);
 
   const resetAllData = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY_ITEMS);
@@ -548,6 +700,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     changeUserRole,
     switchUser,
     addNewMockUser,
+    loginWithGoogle,
     resetAllData,
   }), [
     currentUser,
@@ -578,6 +731,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     changeUserRole,
     switchUser,
     addNewMockUser,
+    loginWithGoogle,
     resetAllData,
   ]);
 

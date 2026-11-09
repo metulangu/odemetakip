@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Home, 
   Cake, 
@@ -14,9 +14,12 @@ import {
   CreditCard,
   Clock,
   Mic,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
+import { AdminUsersModal } from './AdminUsersModal.tsx';
 
 interface HubViewProps {
   onSelectModule: (module: 'expenses' | 'birthdays' | 'shopping') => void;
@@ -24,31 +27,67 @@ interface HubViewProps {
 }
 
 export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) => {
-  const { theme, toggleTheme } = useFinance();
+  const { theme, toggleTheme, currentUser, allUsers } = useFinance();
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+
+  const isAdmin =
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.email?.toLowerCase() === 'mturkey11@gmail.com';
+  const pendingCount = allUsers.filter((u) => u.status === 'PENDING').length;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-indigo-200">
       
       {/* Top Navigation Bar */}
       <header className="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
             <img 
               src="/favicon.svg" 
               alt="Best Home" 
               className="w-9 h-9 rounded-xl shadow-xs shrink-0 select-none" 
             />
-            <div>
-              <h1 className="font-extrabold text-base sm:text-lg tracking-tight leading-none text-slate-900 dark:text-white">
-                Best Home
+            <div className="min-w-0">
+              <h1 className="font-extrabold text-base sm:text-lg tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Best Home</span>
+                {currentUser && (
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 truncate max-w-[180px]">
+                    {currentUser.email}
+                  </span>
+                )}
               </h1>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">
                 Yönetim &amp; Takip Merkezi
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Notification Center (Expenses & Birthdays) */}
+            <NotificationCenter onNavigate={(mod) => onSelectModule(mod)} />
+
+            {/* Admin User Approval Panel (for mturkey11@gmail.com) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setAdminModalOpen(true)}
+                title="Admin Paneli: Kullanıcı Onay ve Yetki Yönetimi"
+                className={`relative p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                  pendingCount > 0
+                    ? 'bg-amber-500 text-slate-950 border-amber-600 animate-pulse'
+                    : 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-100'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span className="hidden md:inline">Admin Onay</span>
+                {pendingCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-950 text-amber-400">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -74,6 +113,32 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
       {/* Main Hub Body */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col justify-center">
         
+        {/* Pending Users Alert Banner for Admin (mturkey11@gmail.com) */}
+        {isAdmin && pendingCount > 0 && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 font-bold">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                  {pendingCount} Yeni Google Kullanıcısı Onayınızı Bekliyor!
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-300/90">
+                  Onayladığınızda sisteme kalıcı olarak giriş yapabilirler (Gemini API anahtarınız onlara açılmaz).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer shadow-xs"
+            >
+              Onay Paneline Git →
+            </button>
+          </div>
+        )}
+
         {/* Welcome Section */}
         <div className="text-center max-w-xl mx-auto mb-8 sm:mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold mb-3 border border-purple-500/20">
@@ -271,6 +336,12 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
           <span>Çok Yıllı Bulut Senkronizasyonu (Cloudflare D1)</span>
         </div>
       </main>
+
+      {/* Admin Users Approval Modal */}
+      <AdminUsersModal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+      />
 
     </div>
   );

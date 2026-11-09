@@ -28,6 +28,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
 
 export interface BirthdayPerson {
   id: string;
@@ -38,6 +39,7 @@ export interface BirthdayPerson {
   category: 'Aile' | 'Akraba' | 'Arkadaş' | 'İş' | 'Diğer';
   phone?: string;
   notes?: string;
+  acknowledgedYear?: number; // Kullanıcı 'Tamam, Haberim Var' dediğinde işaretlenen yıl
   createdAt: string;
 }
 
@@ -193,13 +195,28 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
         setCloudStatus('offline');
       });
 
-    return () => { active = false; };
+    const handleExternalUpdate = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setPeople(parsed);
+        }
+      } catch {}
+    };
+    window.addEventListener('besthome-data-updated', handleExternalUpdate);
+
+    return () => {
+      active = false;
+      window.removeEventListener('besthome-data-updated', handleExternalUpdate);
+    };
   }, []);
 
   const savePeople = (newList: BirthdayPerson[]) => {
     setPeople(newList);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      window.dispatchEvent(new Event('besthome-data-updated'));
     } catch {}
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -218,6 +235,22 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
         setCloudStatus('offline');
       }
     }, 1200);
+  };
+
+  // Kişi "Tamam, Haberim Var" butonuna bastığında bu yılın bildirimini sustur
+  const handleToggleAcknowledge = (person: BirthdayPerson, targetYear: number) => {
+    const isAlreadyAck = person.acknowledgedYear === targetYear;
+    const updated = people.map(p =>
+      p.id === person.id
+        ? { ...p, acknowledgedYear: isAlreadyAck ? undefined : targetYear }
+        : p
+    );
+    savePeople(updated);
+    showToast(
+      isAlreadyAck
+        ? `🔔 ${person.fullName} için doğum günü bildirimleri tekrar açıldı.`
+        : `✅ ${person.fullName} için "Tamam, Haberim Var" işaretlendi. Bildirim durduruldu!`
+    );
   };
 
   // Open Add Modal
@@ -418,6 +451,13 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               <ShoppingCart className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Alışveriş</span>
             </button>
+
+            {/* Notification Center */}
+            <NotificationCenter
+              onNavigate={(mod) => {
+                if (mod !== 'birthdays') onNavigate(mod);
+              }}
+            />
 
             {/* Add Person Primary Button */}
             <button
@@ -772,11 +812,11 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
                         </p>
                       )}
 
-                      {/* Bottom Row: Countdown Tag + Actions */}
+                      {/* Bottom Row: Countdown Tag + Acknowledge ("Tamam, Haberim Var") + Actions */}
                       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
                         
-                        {/* Countdown Badge */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Countdown Badge & "Tamam, Haberim Var" Button */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {isToday ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black bg-pink-600 text-white shadow-xs">
                               <PartyPopper className="w-3.5 h-3.5" />
@@ -796,6 +836,31 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
                             <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-mono font-medium">
                               <span>{diffDays} gün kaldı</span>
                             </span>
+                          )}
+
+                          {/* 3 gün ve daha az kaldığında "Tamam, Haberim Var" butonu */}
+                          {diffDays <= 3 && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAcknowledge(p, p.stats.nextDate.getFullYear())}
+                              title={
+                                p.acknowledgedYear === p.stats.nextDate.getFullYear()
+                                  ? 'Bildirim susturuldu. Tekrar açmak için tıklayın.'
+                                  : 'Bildirimi durdurmak için Tamam, Haberim Var olarak işaretleyin'
+                              }
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer border ${
+                                p.acknowledgedYear === p.stats.nextDate.getFullYear()
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                                  : 'bg-pink-600 hover:bg-pink-700 text-white border-pink-600 shadow-xs animate-pulse'
+                              }`}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>
+                                {p.acknowledgedYear === p.stats.nextDate.getFullYear()
+                                  ? 'Haberim Var İşaretlendi'
+                                  : 'Tamam, Haberim Var'}
+                              </span>
+                            </button>
                           )}
                         </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Key, Check, AlertCircle, ExternalLink, Trash2, X, ShieldCheck, Loader2 } from 'lucide-react';
-import { getGeminiApiKey, setGeminiApiKey, testGeminiApiKey } from '../services/geminiShopping.ts';
+import { getGeminiApiKey, setGeminiApiKey, testGeminiApiKey, isPrivilegedGeminiUser, getActiveUserEmail } from '../services/geminiShopping.ts';
 
 interface GeminiApiKeyModalProps {
   isOpen: boolean;
@@ -17,17 +17,28 @@ export const GeminiApiKeyModal: React.FC<GeminiApiKeyModalProps> = ({
   const [testing, setTesting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
+  const userEmail = getActiveUserEmail();
+  const isVip = isPrivilegedGeminiUser(userEmail);
+
   useEffect(() => {
     if (isOpen) {
-      const existing = getGeminiApiKey();
-      setApiKey(existing);
-      setStatusMessage(
-        existing
-          ? { type: 'info', text: 'Kayıtlı Gemini API anahtarınız mevcut. İsterseniz değiştirebilir veya test edebilirsiniz.' }
-          : null
-      );
+      if (isVip) {
+        setApiKey('');
+        setStatusMessage({
+          type: 'success',
+          text: `${userEmail} hesabınız için kalıcı Gemini AI anahtarı otomatik olarak tanımlıdır. Ekstra bir anahtar girmenize gerek yoktur.`
+        });
+      } else {
+        const existing = getGeminiApiKey(userEmail);
+        setApiKey(existing);
+        setStatusMessage(
+          existing
+            ? { type: 'info', text: 'Kayıtlı kişisel Gemini API anahtarınız aktif. İsterseniz değiştirebilirsiniz.' }
+            : { type: 'info', text: 'Bu hesap için kendi ücretsiz Google Gemini API anahtarınızı girmeniz gerekmektedir.' }
+        );
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isVip, userEmail]);
 
   if (!isOpen) return null;
 

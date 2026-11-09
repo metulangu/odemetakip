@@ -11,17 +11,22 @@ export default {
     // API Endpoint for AI Shopping Parser: /api/ai/parse-shopping
     if (url.pathname === '/api/ai/parse-shopping' && request.method === 'POST') {
       try {
+        const { input, userEmail, customApiKey } = await request.json() as { input?: string; userEmail?: string; customApiKey?: string };
+        const normalizedEmail = (userEmail || '').trim().toLowerCase();
+        const isPrivileged = normalizedEmail === 'mturkey11@gmail.com' || normalizedEmail === 'meryemmehmetturhan@gmail.com';
+
         const obfKey = 'QVEuQWI4Uk42SnZYeTY3VlE5eHpMQXVPcVVQYWpLVEQ0MzYyRTJOTlhwQUJJZHhUV21PNFE=';
         const defaultKey = typeof atob !== 'undefined' ? atob(obfKey) : '';
-        const apiKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || defaultKey;
+        const serverKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || defaultKey;
+
+        const apiKey = customApiKey?.trim() || (isPrivileged ? serverKey : '');
         if (!apiKey) {
-          return new Response(JSON.stringify({ success: false, error: 'GEMINI_API_KEY not configured on server' }), {
-            status: 400,
+          return new Response(JSON.stringify({ success: false, error: 'Bu hesap için kendi Gemini API anahtarınızı girmeniz gerekmektedir.' }), {
+            status: 403,
             headers: { 'Content-Type': 'application/json' }
           });
         }
 
-        const { input } = await request.json() as { input?: string };
         if (!input || !input.trim()) {
           return new Response(JSON.stringify({ success: true, items: [] }), {
             headers: { 'Content-Type': 'application/json' }
@@ -101,6 +106,8 @@ Her ürün için name, quantity ve category içeren JSON dizisi döndür.`;
         targetId = "birthdays_workspace";
       } else if (key === "shopping") {
         targetId = "shopping_workspace";
+      } else if (key === "users") {
+        targetId = "users_workspace";
       }
 
       if (request.method === 'GET') {
