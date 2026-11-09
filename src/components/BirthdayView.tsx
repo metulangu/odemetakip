@@ -29,6 +29,12 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { NotificationCenter } from './NotificationCenter.tsx';
+import {
+  isMainFamilyAccount,
+  getBirthdayStorageKey,
+  getApiDataUrl,
+  createNewUserStarterBirthdays
+} from '../utils/userStorage.ts';
 
 export interface BirthdayPerson {
   id: string;
@@ -136,18 +142,21 @@ interface BirthdayViewProps {
 }
 
 export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout }) => {
-  const { theme, toggleTheme } = useFinance();
+  const { theme, toggleTheme, currentUser } = useFinance();
+  const userEmail = currentUser?.email;
+  const isFamily = isMainFamilyAccount(userEmail);
+  const userStorageKey = getBirthdayStorageKey(userEmail);
 
-  // State
+  // State (Kullanıcıya özel)
   const [people, setPeople] = useState<BirthdayPerson[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return DEFAULT_DEMO_PEOPLE;
+    return isFamily ? DEFAULT_DEMO_PEOPLE : createNewUserStarterBirthdays();
   });
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'calendar' | 'all'>('upcoming');
@@ -177,10 +186,12 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Cloud Sync
+  // Cloud Sync (Kullanıcıya özel)
   useEffect(() => {
     let active = true;
-    fetch('/api/data?key=birthdays')
+    const apiUrl = getApiDataUrl('birthdays', userEmail);
+
+    fetch(apiUrl)
       .then(res => {
         if (res.ok) return res.json();
         throw new Error('Veri yok');
@@ -188,7 +199,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
       .then(data => {
         if (!active || !Array.isArray(data)) return;
         setPeople(data);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+        try { localStorage.setItem(userStorageKey, JSON.stringify(data)); } catch {}
         setCloudStatus('synced');
       })
       .catch(() => {
@@ -197,7 +208,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
 
     const handleExternalUpdate = () => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(userStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) setPeople(parsed);
@@ -210,12 +221,12 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
       active = false;
       window.removeEventListener('besthome-data-updated', handleExternalUpdate);
     };
-  }, []);
+  }, [userEmail, userStorageKey]);
 
   const savePeople = (newList: BirthdayPerson[]) => {
     setPeople(newList);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      localStorage.setItem(userStorageKey, JSON.stringify(newList));
       window.dispatchEvent(new Event('besthome-data-updated'));
     } catch {}
 
@@ -224,7 +235,8 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
 
     syncTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch('/api/data?key=birthdays', {
+        const apiUrl = getApiDataUrl('birthdays', userEmail);
+        const res = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newList)

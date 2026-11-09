@@ -101,13 +101,24 @@ Her ürün için name, quantity ve category içeren JSON dizisi döndür.`;
     // API Endpoint for Database Sync: /api/data
     if (url.pathname === '/api/data') {
       const key = url.searchParams.get("key");
-      let targetId = "lorem_workspace";
-      if (key === "birthdays") {
-        targetId = "birthdays_workspace";
+      const userParam = (url.searchParams.get("user") || "").trim().toLowerCase();
+
+      // Ana aile hesapları (mturkey11 ve meryemmehmetturhan) ana veritabanını paylaşır
+      const isMainFamily =
+        !userParam ||
+        userParam === 'mturkey11@gmail.com' ||
+        userParam === 'meryemmehmetturhan@gmail.com' ||
+        userParam === 'meryemmehmetturkey@gmail.com';
+
+      const userSlug = userParam ? userParam.replace(/[^a-z0-9]/g, '_') : 'guest';
+
+      let targetId = isMainFamily ? "lorem_workspace" : `lorem_${userSlug}`;
+      if (key === "users") {
+        targetId = "users_workspace"; // Tüm kullanıcı yönetimi ortak kalır
+      } else if (key === "birthdays") {
+        targetId = isMainFamily ? "birthdays_workspace" : `birthdays_${userSlug}`;
       } else if (key === "shopping") {
-        targetId = "shopping_workspace";
-      } else if (key === "users") {
-        targetId = "users_workspace";
+        targetId = isMainFamily ? "shopping_workspace" : `shopping_${userSlug}`;
       }
 
       if (request.method === 'GET') {

@@ -1,5 +1,6 @@
 import { LoremState, LoremItem, getItemYearData } from '../components/LoremHomeView.tsx';
 import { BirthdayPerson } from '../components/BirthdayView.tsx';
+import { getExpenseStorageKey, getBirthdayStorageKey, getApiDataUrl } from '../utils/userStorage.ts';
 
 export interface AppNotificationItem {
   id: string;
@@ -316,10 +317,12 @@ export async function triggerDailyPhoneNotifications(items: AppNotificationItem[
 export async function markExpensePaidFromNotification(
   itemId: string,
   year: number,
-  monthIndex: number
+  monthIndex: number,
+  userEmail?: string | null
 ): Promise<boolean> {
   try {
-    const raw = localStorage.getItem(EXPENSE_STORAGE_KEY);
+    const storageKey = getExpenseStorageKey(userEmail);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return false;
     const state: LoremState = JSON.parse(raw);
     if (!state || !Array.isArray(state.items)) return false;
@@ -350,10 +353,11 @@ export async function markExpensePaidFromNotification(
       items: updatedItems
     };
 
-    localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(nextState));
+    localStorage.setItem(storageKey, JSON.stringify(nextState));
     window.dispatchEvent(new Event('besthome-data-updated'));
 
-    await fetch('/api/data', {
+    const apiUrl = getApiDataUrl(null, userEmail);
+    await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(nextState)
@@ -370,10 +374,12 @@ export async function markExpensePaidFromNotification(
  */
 export async function acknowledgeBirthdayFromNotification(
   personId: string,
-  targetYear: number
+  targetYear: number,
+  userEmail?: string | null
 ): Promise<boolean> {
   try {
-    const raw = localStorage.getItem(BIRTHDAY_STORAGE_KEY);
+    const storageKey = getBirthdayStorageKey(userEmail);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return false;
     const people: BirthdayPerson[] = JSON.parse(raw);
     if (!Array.isArray(people)) return false;
@@ -382,10 +388,11 @@ export async function acknowledgeBirthdayFromNotification(
       p.id === personId ? { ...p, acknowledgedYear: targetYear } : p
     );
 
-    localStorage.setItem(BIRTHDAY_STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem(storageKey, JSON.stringify(updated));
     window.dispatchEvent(new Event('besthome-data-updated'));
 
-    await fetch('/api/data?key=birthdays', {
+    const apiUrl = getApiDataUrl('birthdays', userEmail);
+    await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated)

@@ -24,12 +24,15 @@ import {
   acknowledgeBirthdayFromNotification
 } from '../services/notificationService.ts';
 import { sanitize2026Data } from './LoremHomeView.tsx';
+import { useFinance } from '../context/FinanceContext.tsx';
+import { getExpenseStorageKey, getBirthdayStorageKey, getApiDataUrl } from '../utils/userStorage.ts';
 
 interface NotificationCenterProps {
   onNavigate?: (module: 'expenses' | 'birthdays' | 'shopping') => void;
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) => {
+  const { currentUser } = useFinance();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotificationItem[]>([]);
   const [permState, setPermState] = useState<NotificationPermission | 'unsupported'>(() =>
@@ -46,13 +49,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
     let expenseState = null;
     let birthdayList = null;
 
+    const expenseKey = getExpenseStorageKey(currentUser?.email);
+    const birthdayKey = getBirthdayStorageKey(currentUser?.email);
+
     try {
-      const rawExp = localStorage.getItem('lorem_home_expense_matrix_v3');
+      const rawExp = localStorage.getItem(expenseKey);
       if (rawExp) expenseState = JSON.parse(rawExp);
     } catch {}
 
     try {
-      const rawBd = localStorage.getItem('best_home_birthdays_v1');
+      const rawBd = localStorage.getItem(birthdayKey);
       if (rawBd) birthdayList = JSON.parse(rawBd);
     } catch {}
 
@@ -64,33 +70,38 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
     if (combined.length > 0) {
       triggerDailyPhoneNotifications(combined);
     }
-  }, []);
+  }, [currentUser?.email]);
 
   // Initial load & cloud hydration so notifications work immediately on any screen
   useEffect(() => {
     registerNotificationServiceWorker();
     refreshNotifications();
 
+    const expenseKey = getExpenseStorageKey(currentUser?.email);
+    const birthdayKey = getBirthdayStorageKey(currentUser?.email);
+    const expenseApiUrl = getApiDataUrl(null, currentUser?.email);
+    const birthdayApiUrl = getApiDataUrl('birthdays', currentUser?.email);
+
     // Ensure both Expenses and Birthdays are synced from D1 for accurate background notifications
-    fetch('/api/data')
+    fetch(expenseApiUrl)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data && Array.isArray(data.items)) {
           const sanitized = sanitize2026Data(data);
           try {
-            localStorage.setItem('lorem_home_expense_matrix_v3', JSON.stringify(sanitized));
+            localStorage.setItem(expenseKey, JSON.stringify(sanitized));
           } catch {}
           refreshNotifications();
         }
       })
       .catch(() => {});
 
-    fetch('/api/data?key=birthdays')
+    fetch(birthdayApiUrl)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (Array.isArray(data)) {
           try {
-            localStorage.setItem('best_home_birthdays_v1', JSON.stringify(data));
+            localStorage.setItem(birthdayKey, JSON.stringify(data));
           } catch {}
           refreshNotifications();
         }
@@ -105,7 +116,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
       window.removeEventListener('besthome-data-updated', handleDataUpdated);
       clearInterval(interval);
     };
-  }, [refreshNotifications]);
+  }, [refreshNotifications, currentUser?.email]);
 
   const handleEnablePhoneNotifications = async () => {
     const res = await requestPhoneNotificationPermission();
@@ -142,7 +153,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
 
   const handleMarkPaid = async (n: AppNotificationItem) => {
     if (!n.expenseItemId || n.expenseYear === undefined || n.expenseMonth === undefined) return;
-    const ok = await markExpensePaidFromNotification(n.expenseItemId, n.expenseYear, n.expenseMonth);
+    const ok = await markExpensePaidFromNotification(
+      n.expenseItemId,
+      n.expenseYear,
+      n.expenseMonth,
+      currentUser?.email
+    );
     if (ok) {
       showFeedback('✅ Ödendi olarak işaretlendi, bildirim durduruldu!');
       refreshNotifications();
@@ -151,7 +167,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
 
   const handleAcknowledgeBirthday = async (n: AppNotificationItem) => {
     if (!n.birthdayPersonId || !n.birthdayTargetYear) return;
-    const ok = await acknowledgeBirthdayFromNotification(n.birthdayPersonId, n.birthdayTargetYear);
+    const ok = await acknowledgeBirthdayFromNotification(
+      n.birthdayPersonId,
+      n.birthdayTargetYear,
+      currentUser?.email
+    );
     if (ok) {
       showFeedback('👍 "Tamam, Haberim Var" işaretlendi, bildirim durduruldu!');
       refreshNotifications();

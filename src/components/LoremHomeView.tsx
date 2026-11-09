@@ -46,6 +46,13 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter.tsx';
+import { useFinance } from '../context/FinanceContext.tsx';
+import { 
+  isMainFamilyAccount, 
+  getExpenseStorageKey, 
+  getApiDataUrl, 
+  createNewUserStarterExpenses 
+} from '../utils/userStorage.ts';
 
 export interface LoremYearData {
   amounts: number[];
@@ -461,33 +468,45 @@ interface LoremHomeViewProps {
 }
 
 export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace, onSwitchModule, onLogout }) => {
+  const { currentUser } = useFinance();
+  const userEmail = currentUser?.email;
+  const isFamily = isMainFamilyAccount(userEmail);
+  const userStorageKey = getExpenseStorageKey(userEmail);
+
   const [data, setData] = useState<LoremState>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.items)) {
           return sanitize2026Data(parsed);
         }
       }
-      // Eski versiyonlardan (v2, v1) temizleyerek taşıma
-      const oldSaved = localStorage.getItem('lorem_home_expense_matrix_v2') || localStorage.getItem('lorem_home_expense_matrix_v1');
-      if (oldSaved) {
-        const parsedOld = JSON.parse(oldSaved);
-        if (parsedOld && Array.isArray(parsedOld.items)) {
-          const sanitized = sanitize2026Data(parsedOld);
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-          } catch {}
-          return sanitized;
+      // Sadece ana aile için eski versiyonlardan (v2, v1) temizleyerek taşıma
+      if (isFamily) {
+        const oldSaved = localStorage.getItem('lorem_home_expense_matrix_v2') || localStorage.getItem('lorem_home_expense_matrix_v1');
+        if (oldSaved) {
+          const parsedOld = JSON.parse(oldSaved);
+          if (parsedOld && Array.isArray(parsedOld.items)) {
+            const sanitized = sanitize2026Data(parsedOld);
+            try {
+              localStorage.setItem(userStorageKey, JSON.stringify(sanitized));
+            } catch {}
+            return sanitized;
+          }
         }
       }
     } catch {
       // fallback
     }
-    const fresh = createInitialDemoState();
+
+    // Ana aile için mevcut demo verileri, diğer onaylı kullanıcılar için temiz ve bağımsız başlangıç verisi
+    const fresh = isFamily
+      ? createInitialDemoState()
+      : createNewUserStarterExpenses(currentUser?.name);
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+      localStorage.setItem(userStorageKey, JSON.stringify(fresh));
     } catch {}
     return fresh;
   });
@@ -521,10 +540,12 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
     document.title = 'Best Home';
   }, []);
 
-  // Fetch initial data from Cloudflare D1 / KV API if online
+  // Fetch initial data from Cloudflare D1 / KV API if online (kullanıcıya özel)
   useEffect(() => {
     let active = true;
-    fetch('/api/data')
+    const apiUrl = getApiDataUrl(null, userEmail);
+
+    fetch(apiUrl)
       .then(res => {
         if (res.ok) return res.json();
         throw new Error('Bulut verisi yok');
@@ -534,13 +555,13 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
         const sanitized = sanitize2026Data(remoteData);
         setData(sanitized);
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+          localStorage.setItem(userStorageKey, JSON.stringify(sanitized));
           window.dispatchEvent(new Event('besthome-data-updated'));
         } catch {}
 
         // Buluttaki veri eski veya v3 değilse, temizlenmiş güncel hali buluta kaydet
         if (remoteData.version !== 3) {
-          fetch('/api/data', {
+          fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(sanitized)
@@ -554,7 +575,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
 
     const handleExternalUpdate = () => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(userStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && Array.isArray(parsed.items)) {
@@ -569,27 +590,28 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
       active = false;
       window.removeEventListener('besthome-data-updated', handleExternalUpdate);
     };
-  }, []);
+  }, [userEmail, userStorageKey]);
 
-  // Persist state & debounce sync to Cloudflare D1
+  // Persist state & debounce sync to Cloudflare D1 (kullanıcıya özel)
   const saveData = (nextData: typeof data) => {
     setData(nextData);
     
-    // 1. Yerel Hafızaya Anında Kaydet (Offline-first)
+    // 1. Yerel Hafızaya Anında Kaydet (Offline-first, kullanıcıya özel)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextData));
+      localStorage.setItem(userStorageKey, JSON.stringify(nextData));
       window.dispatchEvent(new Event('besthome-data-updated'));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
 
-    // 2. Cloudflare D1 / KV Sunucusuna Eşitle (Debounce 1.2s)
+    // 2. Cloudflare D1 / KV Sunucusuna Eşitle (Debounce 1.2s, kullanıcıya özel)
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     setCloudSyncStatus('syncing');
 
     syncTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch('/api/data', {
+        const apiUrl = getApiDataUrl(null, userEmail);
+        const res = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(nextData)

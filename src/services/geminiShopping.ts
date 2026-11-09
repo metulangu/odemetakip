@@ -10,7 +10,8 @@ export const DEFAULT_GEMINI_API_KEY = typeof atob !== 'undefined' ? atob(OBF_KEY
 
 export const PRIVILEGED_GEMINI_EMAILS = [
   'mturkey11@gmail.com',
-  'meryemmehmetturhan@gmail.com'
+  'meryemmehmetturhan@gmail.com',
+  'meryemmehmetturkey@gmail.com'
 ];
 
 export interface ParsedShoppingItem {

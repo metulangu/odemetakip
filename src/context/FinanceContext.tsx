@@ -67,7 +67,11 @@ const STORAGE_KEY_ACTIVE_USER = 'argon_finance_active_user_v2';
 const STORAGE_KEY_THEME = 'argon_finance_theme_v2';
 
 export const ADMIN_EMAIL = 'mturkey11@gmail.com';
-export const VIP_GEMINI_EMAILS = ['mturkey11@gmail.com', 'meryemmehmetturhan@gmail.com'];
+export const VIP_GEMINI_EMAILS = [
+  'mturkey11@gmail.com',
+  'meryemmehmetturhan@gmail.com',
+  'meryemmehmetturkey@gmail.com'
+];
 
 const INITIAL_USERS: User[] = [
   {
@@ -104,7 +108,7 @@ function ensureCoreUsers(users: User[]): User[] {
       map.set(email, core);
     } else if (email === 'mturkey11@gmail.com') {
       map.set(email, { ...existing, role: 'ADMIN', status: 'APPROVED' });
-    } else if (email === 'meryemmehmetturhan@gmail.com') {
+    } else if (email === 'meryemmehmetturhan@gmail.com' || email === 'meryemmehmetturkey@gmail.com') {
       map.set(email, { ...existing, status: 'APPROVED' });
     }
   }

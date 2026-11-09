@@ -35,6 +35,12 @@ import { parseSpeechOrTextInput, createShoppingItem, removeRepeatedPhrases } fro
 import { parseShoppingItemsWithGemini, hasGeminiApiKey } from '../services/geminiShopping.ts';
 import { GeminiApiKeyModal } from './GeminiApiKeyModal.tsx';
 import { NotificationCenter } from './NotificationCenter.tsx';
+import {
+  isMainFamilyAccount,
+  getShoppingStorageKey,
+  getApiDataUrl,
+  createNewUserStarterShopping
+} from '../utils/userStorage.ts';
 
 interface ShoppingViewProps {
   onNavigate: (module: 'hub' | 'expenses' | 'birthdays') => void;
@@ -122,19 +128,22 @@ const CATEGORIES_LIST: ShoppingCategory[] = [
 
 export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout }) => {
   const { theme, toggleTheme, currentUser } = useFinance();
+  const userEmail = currentUser?.email;
+  const isFamily = isMainFamilyAccount(userEmail);
+  const userStorageKey = getShoppingStorageKey(userEmail);
 
-  // State: Multiple Shopping Lists
+  // State: Multiple Shopping Lists (Kullanıcıya özel)
   const [lists, setLists] = useState<ShoppingList[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) return JSON.parse(saved);
     } catch {}
-    return [];
+    return isFamily ? [] : createNewUserStarterShopping();
   });
 
   const [activeListId, setActiveListId] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
@@ -200,10 +209,12 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     }, 3500);
   };
 
-  // Load from Cloud D1 on initial mount
+  // Load from Cloud D1 on initial mount (Kullanıcıya özel)
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/data?key=shopping')
+    const apiUrl = getApiDataUrl('shopping', userEmail);
+
+    fetch(apiUrl)
       .then(res => {
         if (res.ok) return res.json();
         throw new Error('Veri yok');
@@ -214,7 +225,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
         if (data.length > 0 && !activeListIdRef.current) {
           setActiveListId(data[0].id);
         }
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+        try { localStorage.setItem(userStorageKey, JSON.stringify(data)); } catch {}
         setCloudStatus('synced');
       })
       .catch(() => {
@@ -222,13 +233,13 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
       });
 
     return () => { isMounted = false; };
-  }, []);
+  }, [userEmail, userStorageKey]);
 
-  // Save to LocalStorage & Sync to D1
+  // Save to LocalStorage & Sync to D1 (Kullanıcıya özel)
   const saveLists = (newLists: ShoppingList[]) => {
     setLists(newLists);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newLists));
+      localStorage.setItem(userStorageKey, JSON.stringify(newLists));
     } catch {}
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -236,7 +247,8 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
 
     syncTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch('/api/data?key=shopping', {
+        const apiUrl = getApiDataUrl('shopping', userEmail);
+        const res = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newLists)
