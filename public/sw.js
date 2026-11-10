@@ -7,6 +7,38 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Arka plan Web Push paketlerini dinle (Uygulama kapalıyken bile telefon ekranına düşer)
+self.addEventListener('push', function(event) {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = {
+        title: '🔔 Best Home Hatırlatması',
+        body: event.data.text() || 'Ödeme veya doğum günü hatırlatmanız var.'
+      };
+    }
+  }
+
+  const title = data.title || '🔔 Best Home Hatırlatması';
+  const options = {
+    body: data.body || 'Ödeme veya doğum günü hatırlatmanız var.',
+    icon: '/icon-192.png',
+    badge: '/favicon-32x32.png',
+    tag: data.tag || ('besthome-' + Date.now()),
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 150, 300, 150, 400],
+    data: {
+      url: data.url || '/',
+      module: data.module || 'expenses'
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || '/';

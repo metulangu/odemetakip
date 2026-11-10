@@ -21,7 +21,9 @@ import {
   triggerDailyPhoneNotifications,
   sendNativePhoneNotification,
   markExpensePaidFromNotification,
-  acknowledgeBirthdayFromNotification
+  acknowledgeBirthdayFromNotification,
+  sendServerTestPush,
+  subscribeToWebPush
 } from '../services/notificationService.ts';
 import { sanitize2026Data } from './LoremHomeView.tsx';
 import { useFinance } from '../context/FinanceContext.tsx';
@@ -119,13 +121,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
   }, [refreshNotifications, currentUser?.email]);
 
   const handleEnablePhoneNotifications = async () => {
-    const res = await requestPhoneNotificationPermission();
+    const res = await requestPhoneNotificationPermission(currentUser?.email);
     setPermState(res);
     if (res === 'granted') {
       showFeedback('📲 Telefon bildirimleri başarıyla açıldı!');
+      await subscribeToWebPush(currentUser?.email);
       await sendNativePhoneNotification(
         '🔔 Best Home Bildirimleri Aktif!',
-        'Ödeme ve doğum günü hatırlatmaları artık telefonunuza bildirim olarak gelecek.',
+        'Ödeme ve doğum günü hatırlatmaları her sabah telefonunuza bildirim olarak gelecek.',
         'besthome_welcome_test'
       );
       refreshNotifications();
@@ -139,15 +142,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
       await handleEnablePhoneNotifications();
       return;
     }
-    const ok = await sendNativePhoneNotification(
-      '⚡ Best Home Test Bildirimi',
-      'Elektrik faturasına 3 gün kaldı! & Doğum günü hatırlatma sistemi aktif.',
-      'besthome_manual_test_' + Date.now()
-    );
-    if (ok) {
-      showFeedback('✅ Test bildirimi telefonunuza gönderildi!');
+
+    showFeedback('⏳ Sunucudan telefonunuza test bildirimi gönderiliyor...');
+    const serverOk = await sendServerTestPush(currentUser?.email);
+
+    if (serverOk) {
+      showFeedback('✅ Sunucudan telefonunuza test bildirimi ulaştı! (Uygulama kapalıyken de aynı şekilde sabahları gelecektir)');
     } else {
-      showFeedback('⚠️ Bildirim gönderilemedi, lütfen izinleri kontrol edin.');
+      const localOk = await sendNativePhoneNotification(
+        '⚡ Best Home Test Bildirimi',
+        'Elektrik faturasına 3 gün kaldı! & Doğum günü hatırlatma sistemi aktif.',
+        'besthome_manual_test_' + Date.now()
+      );
+      if (localOk) {
+        showFeedback('✅ Test bildirimi telefonunuza gönderildi!');
+      } else {
+        showFeedback('⚠️ Bildirim gönderilemedi, lütfen izinleri kontrol edin.');
+      }
     }
   };
 

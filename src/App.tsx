@@ -17,7 +17,8 @@ import {
   sendNativePhoneNotification,
   autoPromptPhoneNotification,
   getNotificationPermissionState,
-  registerNotificationServiceWorker
+  registerNotificationServiceWorker,
+  subscribeToWebPush
 } from './services/notificationService.ts';
 
 function AppContent() {
@@ -39,10 +40,13 @@ function AppContent() {
 
   useEffect(() => {
     registerNotificationServiceWorker();
-    autoPromptPhoneNotification().then((perm) => {
+    autoPromptPhoneNotification(currentUser?.email).then((perm) => {
       setPermState(perm);
+      if (perm === 'granted' && currentUser?.email) {
+        subscribeToWebPush(currentUser.email);
+      }
     });
-  }, []);
+  }, [currentUser?.email]);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -56,12 +60,12 @@ function AppContent() {
   }, []);
 
   const handleEnablePhoneNotifications = async () => {
-    const res = await requestPhoneNotificationPermission();
+    const res = await requestPhoneNotificationPermission(currentUser?.email);
     setPermState(res);
     if (res === 'granted') {
       await sendNativePhoneNotification(
         '🔔 Bildirimler Aktif!',
-        'Faturalarınız (3, 2, 1 gün kala ve gecikince) ile doğum günleri telefonunuza bildirim olarak gelecek.',
+        'Faturalarınız (3, 2, 1 gün kala ve gecikince) ile doğum günleri her sabah telefonunuza bildirim olarak gelecek.',
         'besthome_welcome'
       );
       window.dispatchEvent(new Event('besthome-data-updated'));

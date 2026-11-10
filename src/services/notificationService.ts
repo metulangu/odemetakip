@@ -48,13 +48,99 @@ export function getNotificationPermissionState(): NotificationPermission | 'unsu
   return Notification.permission;
 }
 
+export const VAPID_PUBLIC_KEY = 'BAnt2tVWWUkA7QY60f66yQhu_jOZrgY5xYaRXS0PZ3GlBL7MxAO9kXV-wZKa1RoZORzjfYCNJoDVxKRHO3EOXKc';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Subscribes the current device to Cloudflare Web Push and registers it in D1.
+ * This enables the server to push notifications every morning even when the app is CLOSED!
+ */
+export async function subscribeToWebPush(userEmail?: string | null): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return false;
+  }
+  try {
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      reg = await navigator.serviceWorker.register('/sw.js');
+    }
+    await navigator.serviceWorker.ready;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any
+      });
+    }
+
+    if (sub) {
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          userEmail: (userEmail || 'guest').trim().toLowerCase()
+        })
+      });
+    }
+    return true;
+  } catch (err) {
+    console.warn('Web Push subscription failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Sends an immediate Web Push from the Cloudflare server to test screen-off delivery
+ */
+export async function sendServerTestPush(userEmail?: string | null): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return false;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const ok = await subscribeToWebPush(userEmail);
+      if (!ok) return false;
+      sub = await reg.pushManager.getSubscription();
+    }
+    if (!sub) return false;
+
+    const res = await fetch('/api/push/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        userEmail
+      })
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('sendServerTestPush error:', e);
+    return false;
+  }
+}
+
 /**
  * Requests permission to show native phone/browser notifications (Flalingo & Duagu style)
  */
-export async function autoPromptPhoneNotification(): Promise<NotificationPermission | 'unsupported'> {
+export async function autoPromptPhoneNotification(userEmail?: string | null): Promise<NotificationPermission | 'unsupported'> {
   if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
   if (Notification.permission === 'granted') {
     await registerNotificationServiceWorker();
+    await subscribeToWebPush(userEmail);
     return 'granted';
   }
   if (Notification.permission === 'default') {
@@ -62,6 +148,7 @@ export async function autoPromptPhoneNotification(): Promise<NotificationPermiss
       const perm = await Notification.requestPermission();
       if (perm === 'granted') {
         await registerNotificationServiceWorker();
+        await subscribeToWebPush(userEmail);
       }
       return perm;
     } catch {
@@ -74,7 +161,7 @@ export async function autoPromptPhoneNotification(): Promise<NotificationPermiss
 /**
  * Requests permission to show native phone/browser notifications
  */
-export async function requestPhoneNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
+export async function requestPhoneNotificationPermission(userEmail?: string | null): Promise<NotificationPermission | 'unsupported'> {
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'unsupported';
   }
@@ -82,6 +169,7 @@ export async function requestPhoneNotificationPermission(): Promise<Notification
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       await registerNotificationServiceWorker();
+      await subscribeToWebPush(userEmail);
     }
     return permission;
   } catch {

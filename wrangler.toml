@@ -9,3 +9,13 @@ directory = "./dist"
 binding = "DB"
 database_name = "odemetakip_db"
 database_id = "1cafeb1b-d43a-494b-b519-a8b6954b72b1"
+
+# Her sabah saat 09:00'da (Türkiye Saati: UTC 06:00) otomatik arka plan bildirimi
+[triggers]
+crons = ["0 6 * * *"]
+
+[vars]
+VAPID_PUBLIC_KEY = "BAnt2tVWWUkA7QY60f66yQhu_jOZrgY5xYaRXS0PZ3GlBL7MxAO9kXV-wZKa1RoZORzjfYCNJoDVxKRHO3EOXKc"
+VAPID_PRIVATE_KEY = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgPKbI_KWy2loYfyv0ehXHwo-7dBwdP-wBsBa8HAf9r9ihRANCAAQJ7drVVllJAO0GOtH-uskIbv4zma4GOcWGkV0tD2dxpQS-zMQDvZF1fsGSmtUaGTkc432AjSaA1cSkRztxDlyn"
+VAPID_SUBJECT = "mailto:mturkey11@gmail.com"
+
