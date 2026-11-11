@@ -43,7 +43,8 @@ import {
   Building2,
   Cake,
   LayoutGrid,
-  ShoppingCart
+  ShoppingCart,
+  Menu
 } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter.tsx';
 import { useFinance } from '../context/FinanceContext.tsx';
@@ -171,7 +172,7 @@ export interface LoremState {
 export interface DueStatus {
   dueDay: number;
   diffDays: number;
-  status: 'paid' | 'green' | 'yellow' | 'red';
+  status: 'paid' | 'normal' | 'yellow' | 'red';
   text: string;
   shortText: string;
   badgeClass: string;
@@ -253,11 +254,11 @@ export function getDueStatus(dueDay: number = 15, monthIndex: number, year: numb
     return {
       dueDay: safeDueDay,
       diffDays,
-      status: 'green',
+      status: 'normal',
       text: `${diffDays} gün kaldı`,
       shortText: `${diffDays} gün`,
-      badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
-      dotClass: 'bg-emerald-500'
+      badgeClass: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200/80 dark:border-zinc-700/80 font-medium',
+      dotClass: 'bg-slate-400 dark:bg-zinc-500'
     };
   } else if (diffDays >= 3 && diffDays <= 7) {
     return {
@@ -475,6 +476,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
   // Cloud Sync Status (Cloudflare D1 / KV / API)
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('offline');
   const syncTimeoutRef = useRef<any>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Category Modal State
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -704,7 +706,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
     const y = data.selectedYear;
     let red = 0;
     let yellow = 0;
-    let green = 0;
+    let normal = 0;
 
     data.items.forEach(item => {
       const yearData = getItemYearData(item, y);
@@ -713,11 +715,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
         const status = getDueStatus(item.dueDay || 15, mIdx, y, false);
         if (status.status === 'red') red++;
         else if (status.status === 'yellow') yellow++;
-        else if (status.status === 'green') green++;
+        else normal++;
       }
     });
 
-    return { red, yellow, green };
+    return { red, yellow, normal };
   }, [data.selectedYear, data.selectedMonth, data.items]);
 
   // Filtered items in monthly view
@@ -999,8 +1001,8 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-100 font-sans transition-colors duration-150 flex flex-col">
       
       {/* TOP HEADER BAR */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
-        <div className="max-w-[1440px] mx-auto px-2.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           
           {/* Brand & Workspace Title */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1024,7 +1026,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                       ? 'Buluta kaydediliyor...'
                       : 'Yerel mod (İnternet veya API bağlantısı yok)'
                   }
-                  className={`hidden md:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all ${
+                  className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all ${
                     cloudSyncStatus === 'synced'
                       ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
                       : cloudSyncStatus === 'syncing'
@@ -1032,40 +1034,27 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                       : 'text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700'
                   }`}
                 >
-                  {cloudSyncStatus === 'synced' ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span>Bulut Eşitlendi (D1)</span>
-                    </>
-                  ) : cloudSyncStatus === 'syncing' ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      <span>Eşitleniyor...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                      <span>Yerel Hafıza</span>
-                    </>
-                  )}
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    cloudSyncStatus === 'synced' ? 'bg-emerald-500' : cloudSyncStatus === 'syncing' ? 'bg-amber-500' : 'bg-slate-400'
+                  }`} />
+                  <span className="hidden sm:inline">{cloudSyncStatus === 'synced' ? 'Bulut Eşitlendi' : cloudSyncStatus === 'syncing' ? 'Eşitleniyor...' : 'Yerel'}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* View Switchers & Right Controls */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            
+          {/* Desktop Right Controls (md:flex, hidden on mobile) */}
+          <div className="hidden md:flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Return to Hub */}
             {onSwitchModule && (
               <button
                 type="button"
                 onClick={() => onSwitchModule('hub')}
                 title="Ana Modül Kartlarına Dön"
-                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs"
               >
                 <LayoutGrid className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span className="hidden md:inline">Modüller</span>
+                <span>Modüller</span>
               </button>
             )}
 
@@ -1075,10 +1064,10 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 type="button"
                 onClick={() => onSwitchModule('birthdays')}
                 title="Doğum Günü Takip Sistemine Geç"
-                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-900/40 border border-pink-200/80 dark:border-pink-800 text-pink-700 dark:text-pink-300 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-900/40 border border-pink-200/80 dark:border-pink-800 text-pink-700 dark:text-pink-300 transition-all cursor-pointer shadow-2xs"
               >
                 <Cake className="w-3.5 h-3.5 text-pink-500" />
-                <span className="hidden md:inline">Doğum Günleri</span>
+                <span>Doğum Günleri</span>
               </button>
             )}
 
@@ -1088,10 +1077,10 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 type="button"
                 onClick={() => onSwitchModule('shopping')}
                 title="Alışveriş Listesine Geç"
-                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 border border-purple-200/80 dark:border-purple-800 text-purple-700 dark:text-purple-300 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 border border-purple-200/80 dark:border-purple-800 text-purple-700 dark:text-purple-300 transition-all cursor-pointer shadow-2xs"
               >
                 <ShoppingCart className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span className="hidden md:inline">Alışveriş</span>
+                <span>Alışveriş</span>
               </button>
             )}
 
@@ -1111,7 +1100,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               <button
                 type="button"
                 onClick={() => saveData({ ...data, viewMode: 'monthly' })}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   data.viewMode === 'monthly'
                     ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
@@ -1119,14 +1108,13 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 title="Aylık Hızlı Giriş"
               >
                 <ListChecks className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Aylık Hızlı Giriş</span>
-                <span className="sm:hidden">Aylık</span>
+                <span>Aylık Hızlı Giriş</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => saveData({ ...data, viewMode: 'matrix' })}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   data.viewMode === 'matrix'
                     ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
@@ -1134,14 +1122,13 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 title="Yıllık Matris"
               >
                 <Table2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Yıllık Matris</span>
-                <span className="sm:hidden">Matris</span>
+                <span>Yıllık Matris</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => saveData({ ...data, viewMode: 'analytics' })}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   data.viewMode === 'analytics'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
@@ -1149,8 +1136,7 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                 title="Grafik & Analiz"
               >
                 <BarChart3 className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Grafik & Analiz</span>
-                <span className="sm:hidden">Grafik</span>
+                <span>Grafik & Analiz</span>
               </button>
             </div>
 
@@ -1159,9 +1145,9 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               type="button"
               onClick={() => setBackupModalOpen(true)}
               title="Veri Tabanı & Yedekleme"
-              className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shadow-2xs shrink-0"
+              className="p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shadow-2xs shrink-0"
             >
-              <Database className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-indigo-500" />
+              <Database className="w-4 h-4 text-indigo-500" />
             </button>
 
             {/* Theme Toggle */}
@@ -1169,9 +1155,9 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               type="button"
               onClick={toggleTheme}
               title="Tema Değiştir"
-              className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shrink-0"
+              className="p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shrink-0"
             >
-              {theme === 'dark' ? <Sun className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-amber-400" /> : <Moon className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-700" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
             </button>
 
             {/* Logout */}
@@ -1179,12 +1165,185 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               type="button"
               onClick={onLogout}
               title="Çıkış Yap"
-              className="p-1.5 sm:p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shrink-0"
+              className="p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shrink-0"
             >
-              <LogOut className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Mobile Right Controls: Notification Center + Hamburger Button (md:hidden) */}
+          <div className="flex md:hidden items-center gap-1.5 shrink-0">
+            <NotificationCenter
+              onNavigate={
+                onSwitchModule
+                  ? (mod) => {
+                      if (mod !== 'expenses') onSwitchModule(mod);
+                    }
+                  : undefined
+              }
+            />
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menüyü Aç / Kapat"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 cursor-pointer transition-all active:scale-95"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Hamburger Drawer Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-zinc-800 bg-white/98 dark:bg-zinc-900/98 backdrop-blur-md px-4 py-3 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
+            {/* View Mode Switching on Mobile */}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-1.5 block">
+                Görünüm Seç
+              </span>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-zinc-800/80 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveData({ ...data, viewMode: 'monthly' });
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                    data.viewMode === 'monthly'
+                      ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400'
+                  }`}
+                >
+                  <ListChecks className="w-3.5 h-3.5" />
+                  <span>Aylık</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveData({ ...data, viewMode: 'matrix' });
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                    data.viewMode === 'matrix'
+                      ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400'
+                  }`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  <span>Matris</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveData({ ...data, viewMode: 'analytics' });
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                    data.viewMode === 'analytics'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Grafik</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation to other modules */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-1 block">
+                Modüller
+              </span>
+
+              {onSwitchModule && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSwitchModule('birthdays');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/15 text-pink-700 dark:text-pink-300 font-bold text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Cake className="w-4 h-4 text-pink-500" />
+                      <span>Doğum Günü Takip Sistemi</span>
+                    </div>
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSwitchModule('shopping');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4 text-purple-500" />
+                      <span>Alışveriş Listesi</span>
+                    </div>
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSwitchModule('hub');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-bold text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4 text-slate-500" />
+                      <span>Tüm Modüller (Ana Merkez)</span>
+                    </div>
+                    <span>→</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Actions: DB backup, theme, logout */}
+            <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBackupModalOpen(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-bold cursor-pointer"
+              >
+                <Database className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Yedek / D1</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-bold cursor-pointer"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+                <span>{theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="inline-flex items-center justify-center p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 cursor-pointer"
+                title="Çıkış Yap"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* MAIN CONTAINER */}
@@ -1394,19 +1553,14 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                     🟡 {monthDueAlertSummary.yellow} Yaklaşan
                   </span>
                 ) : null}
-                {monthDueAlertSummary.green > 0 ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold">
-                    🟢 {monthDueAlertSummary.green} Rahat
-                  </span>
-                ) : null}
-                {monthDueAlertSummary.red === 0 && monthDueAlertSummary.yellow === 0 && monthDueAlertSummary.green === 0 && (
+                {monthDueAlertSummary.red === 0 && monthDueAlertSummary.yellow === 0 && (
                   <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    Tüm ödemeler tamamlandı!
+                    Acil / yaklaşan ödeme yok
                   </span>
                 )}
               </div>
               <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-1 truncate">
-                🟢 &gt;7g · 🟡 3-7g · 🔴 ≤3g
+                🟡 3-7g · 🔴 ≤3g
               </div>
             </div>
           </div>
@@ -1498,20 +1652,17 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
               
               {/* Table Header (Desktop Only) */}
               <div className="hidden md:grid md:grid-cols-12 items-center px-4 py-2.5 bg-slate-50/80 dark:bg-zinc-900/60 border-b border-slate-200/80 dark:border-zinc-800/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 select-none">
-                <div className="col-span-5 flex items-center gap-2 pl-2">
+                <div className="col-span-6 flex items-center gap-2 pl-2">
                   <span>Gider Kalemi · Kategori · Vade Durumu · Son Gün</span>
                 </div>
                 <div className="col-span-2 text-right pr-3">
                   <span>{currentMonthStats.prevIdx !== null ? `${MONTHS_TR[currentMonthStats.prevIdx].full} (Geçen Ay)` : 'Önceki Ay'}</span>
                 </div>
-                <div className="col-span-2 pl-2">
-                  <span>Kısa Not / Açıklama</span>
-                </div>
                 <div className="col-span-2 text-right pr-2">
                   <span>{MONTHS_TR[data.selectedMonth].full} {data.selectedYear} Tutarı (₺)</span>
                 </div>
-                <div className="col-span-1 text-right pr-2">
-                  <span>Durum</span>
+                <div className="col-span-2 text-right pr-2">
+                  <span>Durum &amp; İşlem</span>
                 </div>
               </div>
 
@@ -1526,7 +1677,6 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                   const currAmt = Number(yearData.amounts[mIdx]) || 0;
                   const prevAmt = prevIdx !== null ? (Number(yearData.amounts[prevIdx]) || 0) : 0;
                   const isPaid = Boolean(yearData.paid[mIdx]);
-                  const noteText = (yearData.notes && yearData.notes[mIdx]) ? yearData.notes[mIdx] : '';
                   const catMeta = data.categories.find(c => c.id === item.category) || DEFAULT_CATEGORIES[0];
                   const dueStatus = getDueStatus(item.dueDay || 15, mIdx, y, isPaid);
 
@@ -1539,8 +1689,8 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                           : 'hover:bg-slate-50/90 dark:hover:bg-zinc-800/40'
                       }`}
                     >
-                      {/* Line 1: Index + Name + Category + Due Warning Badge (Desktop Col 1-5) */}
-                      <div className="md:col-span-5 flex flex-col sm:flex-row sm:items-center justify-between md:justify-start gap-1.5 sm:gap-2 min-w-0">
+                      {/* Line 1: Index + Name + Category + Due Warning Badge (Desktop Col 1-6) */}
+                      <div className="md:col-span-6 flex flex-col sm:flex-row sm:items-center justify-between md:justify-start gap-1.5 sm:gap-2 min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <span className="w-5 text-[11px] font-mono text-slate-400 dark:text-zinc-500 tabular-nums shrink-0 select-none">
                             {String(idx + 1).padStart(2, '0')}
@@ -1626,37 +1776,25 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                         </div>
                       </div>
 
-                      {/* Line 2 on mobile: Note and Prev Month together (Desktop Col 6-7, 8-9) */}
-                      <div className="flex items-center justify-between gap-2 md:contents">
-                        <div className="md:col-span-2 flex items-center justify-end md:justify-end gap-1.5 text-xs pr-0 md:pr-3">
-                          <span className="text-[11px] text-slate-400 dark:text-zinc-500">Geçen:</span>
-                          <span className="font-mono tabular-nums text-slate-500 dark:text-zinc-400 font-medium">
-                            {prevIdx !== null ? formatTL(prevAmt) : '—'}
-                          </span>
-                          {prevIdx !== null && prevAmt > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleAmountChange(item.id, mIdx, prevAmt)}
-                              title={`Geçen ayın tutarını (${formatTL(prevAmt)}) bu aya kopyala`}
-                              className="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors cursor-pointer"
-                            >
-                              <ArrowRightToLine className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-2 flex-1 md:flex-initial px-0 md:px-2">
-                          <input
-                            type="text"
-                            value={noteText}
-                            placeholder="kısa not..."
-                            onChange={(e) => handleNoteChange(item.id, mIdx, e.target.value)}
-                            className="w-full text-xs text-slate-700 dark:text-zinc-300 placeholder-slate-400 dark:placeholder-zinc-500 bg-white/80 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-700/80 hover:border-slate-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 focus:bg-white dark:focus:bg-zinc-900 rounded-lg px-2.5 py-1.5 outline-none transition-all text-right md:text-left shadow-2xs"
-                          />
-                        </div>
+                      {/* Desktop Col 7-8: Prev Month */}
+                      <div className="md:col-span-2 flex items-center justify-end gap-1.5 text-xs pr-0 md:pr-3">
+                        <span className="text-[11px] text-slate-400 dark:text-zinc-500 md:hidden">Geçen:</span>
+                        <span className="font-mono tabular-nums text-slate-500 dark:text-zinc-400 font-medium">
+                          {prevIdx !== null ? formatTL(prevAmt) : '—'}
+                        </span>
+                        {prevIdx !== null && prevAmt > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleAmountChange(item.id, mIdx, prevAmt)}
+                            title={`Geçen ayın tutarını (${formatTL(prevAmt)}) bu aya kopyala`}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors cursor-pointer"
+                          >
+                            <ArrowRightToLine className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
 
-                      {/* Line 3 on mobile: Amount + Paid Toggle + Delete (Desktop Col 10-12) */}
+                      {/* Line 2 on mobile: Amount + Paid Toggle + Delete (Desktop Col 9-10 & 11-12) */}
                       <div className="flex items-center justify-between gap-2 md:contents">
                         <div className="md:col-span-2 flex-1 md:flex-initial flex items-center justify-end pr-0 md:pr-2">
                           <div className="relative flex items-center w-full md:w-36">
@@ -1682,11 +1820,11 @@ export const LoremHomeView: React.FC<LoremHomeViewProps> = ({ onSwitchWorkspace,
                           </div>
                         </div>
 
-                        <div className="md:col-span-1 flex items-center justify-end gap-1 shrink-0 pl-1">
+                        <div className="md:col-span-2 flex items-center justify-end gap-1.5 shrink-0 pl-1">
                           <button
                             type="button"
                             onClick={() => handleTogglePaid(item.id, mIdx)}
-                            className={`inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer select-none min-w-[75px] ${
+                            className={`inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer select-none min-w-[80px] ${
                               isPaid
                                 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
                                 : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25 hover:bg-amber-500/20'

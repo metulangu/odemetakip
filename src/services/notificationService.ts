@@ -186,53 +186,74 @@ export async function sendNativePhoneNotification(
   tag: string,
   module: 'expenses' | 'birthdays' = 'expenses'
 ): Promise<boolean> {
-  if (typeof window === 'undefined' || !('Notification' in window)) return false;
-  if (Notification.permission !== 'granted') return false;
+  if (typeof window === 'undefined') return false;
+
+  // Tarayıcı bildirim desteği kontrolü
+  if (!('Notification' in window)) {
+    console.warn('Bu tarayıcı Notification API desteklemiyor.');
+    return false;
+  }
+
+  // İzin default ise isteyelim
+  if (Notification.permission === 'default') {
+    try {
+      await Notification.requestPermission();
+    } catch (e) {
+      console.warn('requestPermission error:', e);
+    }
+  }
+
+  if (Notification.permission !== 'granted') {
+    console.warn('Bildirim izni verilmemiş:', Notification.permission);
+    return false;
+  }
 
   const options: any = {
     body,
     icon: '/icon-192.png',
     badge: '/favicon-32x32.png',
-    tag,
+    tag: tag || ('bh-' + Date.now()),
     renotify: true,
-    requireInteraction: true,
-    vibrate: [300, 150, 300, 150, 400],
+    vibrate: [200, 100, 200, 100, 300],
     data: { url: '/', module }
   };
 
-  try {
-    if ('serviceWorker' in navigator) {
+  // 1. Öncelik: Mobil (Android & iOS PWA) ve Masaüstü için Service Worker showNotification
+  if ('serviceWorker' in navigator) {
+    try {
       let reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
         reg = await navigator.serviceWorker.register('/sw.js');
       }
-      await navigator.serviceWorker.ready;
-      if (reg && 'showNotification' in reg) {
-        await reg.showNotification(title, options);
-        return true;
+      if (reg) {
+        // SW hazır olana kadar maksimum 1.5 sn bekle
+        const swReadyPromise = navigator.serviceWorker.ready;
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+        await Promise.race([swReadyPromise, timeoutPromise]);
+        
+        if ('showNotification' in reg) {
+          await reg.showNotification(title, options);
+          return true;
+        }
       }
+    } catch (swErr) {
+      console.warn('SW showNotification error:', swErr);
     }
+  }
 
-    // Fallback to standard Notification constructor
+  // 2. Yedek: Standart Notification API (Masaüstü Chrome/Edge/Firefox)
+  try {
     const n = new Notification(title, options);
     n.onclick = () => {
       window.focus();
       n.close();
     };
     return true;
-  } catch (err) {
-    console.warn('Native notification error:', err);
-    try {
-      const n = new Notification(title, options);
-      n.onclick = () => {
-        window.focus();
-        n.close();
-      };
-      return true;
-    } catch {
-      return false;
-    }
+  } catch (nErr) {
+    console.warn('Standard Notification fallback error:', nErr);
   }
+
+  return false;
 }
 
 /**

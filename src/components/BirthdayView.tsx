@@ -25,7 +25,8 @@ import {
   Check,
   User,
   Filter,
-  ShoppingCart
+  ShoppingCart,
+  Menu
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { NotificationCenter } from './NotificationCenter.tsx';
@@ -182,6 +183,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
   const [formNotes, setFormNotes] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -403,36 +405,32 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
 
       {/* TOP HEADER */}
       <header className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-600 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-pink-500/25 shrink-0">
-              <Cake className="w-5 h-5" />
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-pink-600 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-pink-500/25 shrink-0">
+              <Cake className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white truncate">
                   Doğum Günü Takip
                 </span>
                 {/* Cloud Status */}
                 <span 
                   title={cloudStatus === 'synced' ? 'Bulut ile eşitlendi' : cloudStatus === 'syncing' ? 'Kaydediliyor...' : 'Yerel hafıza'}
-                  className="hidden md:inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-500"
+                  className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-500"
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${cloudStatus === 'synced' ? 'bg-emerald-500' : cloudStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
-                  {cloudStatus === 'synced' ? 'Bulut Aktif' : cloudStatus === 'syncing' ? 'Eşitleniyor...' : 'Çevrimdışı'}
+                  <span>{cloudStatus === 'synced' ? 'Bulut' : cloudStatus === 'syncing' ? 'Eşitleniyor...' : 'Çevrimdışı'}</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate">
-                Canlı Geri Sayım &bull; Yıllık Takvim &bull; Yaş &amp; Burç
-              </p>
             </div>
           </div>
 
-          {/* Right Header Navigation Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            
+          {/* Desktop Right Header Navigation Actions (hidden on mobile) */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Return to Hub */}
             <button
               type="button"
@@ -441,7 +439,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
             >
               <LayoutGrid className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span className="hidden sm:inline">Modüller</span>
+              <span>Modüller</span>
             </button>
 
             {/* Quick Switch to Best Home Expenses */}
@@ -452,7 +450,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/40 border border-indigo-200/80 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 transition-all cursor-pointer shadow-2xs"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Gider Takibi</span>
+              <span>Gider Takibi</span>
             </button>
 
             {/* Quick Switch to Shopping */}
@@ -463,7 +461,7 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 border border-purple-200/80 dark:border-purple-800 text-purple-700 dark:text-purple-300 transition-all cursor-pointer shadow-2xs"
             >
               <ShoppingCart className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Alışveriş</span>
+              <span>Alışveriş</span>
             </button>
 
             {/* Notification Center */}
@@ -488,9 +486,9 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               type="button"
               onClick={toggleTheme}
               title="Tema Değiştir"
-              className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 transition-all cursor-pointer shadow-2xs"
             >
-              {theme === 'dark' ? <Sun className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-amber-400" /> : <Moon className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-700" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
             </button>
 
             {/* Logout */}
@@ -498,12 +496,119 @@ export const BirthdayView: React.FC<BirthdayViewProps> = ({ onNavigate, onLogout
               type="button"
               onClick={onLogout}
               title="Çıkış Yap"
-              className="p-1.5 sm:p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shadow-2xs"
             >
-              <LogOut className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Mobile Right Header Navigation (md:hidden) */}
+          <div className="flex md:hidden items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Ekle</span>
+            </button>
+
+            <NotificationCenter
+              onNavigate={(mod) => {
+                if (mod !== 'birthdays') onNavigate(mod);
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menüyü Aç / Kapat"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer transition-all active:scale-95"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Hamburger Drawer Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md px-4 py-3 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1 block">
+                Modüller
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('expenses');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Best Home Gider Takibi</span>
+                </div>
+                <span>→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('shopping');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4 text-purple-500" />
+                  <span>Alışveriş Listesi</span>
+                </div>
+                <span>→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('hub');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-slate-500" />
+                  <span>Tüm Modüller (Ana Merkez)</span>
+                </div>
+                <span>→</span>
+              </button>
+            </div>
+
+            {/* Actions: Add, Theme, Logout */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+                <span>{theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="inline-flex items-center justify-center p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 cursor-pointer"
+                title="Çıkış Yap"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* MAIN CONTAINER */}

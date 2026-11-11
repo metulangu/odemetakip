@@ -15,7 +15,9 @@ import {
   Clock,
   Mic,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Menu,
+  X
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { NotificationCenter } from './NotificationCenter.tsx';
@@ -29,6 +31,7 @@ interface HubViewProps {
 export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) => {
   const { theme, toggleTheme, currentUser, allUsers } = useFinance();
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAdmin =
     currentUser?.role === 'ADMIN' ||
@@ -40,12 +43,12 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
       
       {/* Top Navigation Bar */}
       <header className="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <img 
               src="/favicon.svg" 
               alt="Best Home" 
-              className="w-9 h-9 rounded-xl shadow-xs shrink-0 select-none" 
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-xs shrink-0 select-none" 
             />
             <div className="min-w-0">
               <h1 className="font-extrabold text-base sm:text-lg tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
@@ -62,7 +65,8 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Desktop Controls (hidden on mobile) */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Notification Center (Expenses & Birthdays) */}
             <NotificationCenter onNavigate={(mod) => onSelectModule(mod)} />
 
@@ -79,7 +83,7 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span className="hidden md:inline">Admin Onay</span>
+                <span>Admin Onay</span>
                 {pendingCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-slate-950 text-amber-400">
                     {pendingCount}
@@ -104,10 +108,75 @@ export const HubView: React.FC<HubViewProps> = ({ onSelectModule, onLogout }) =>
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shadow-2xs"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Çıkış</span>
+              <span>Çıkış</span>
+            </button>
+          </div>
+
+          {/* Mobile Right Controls: NotificationCenter + Hamburger Button (md:hidden) */}
+          <div className="flex md:hidden items-center gap-1.5 shrink-0">
+            <NotificationCenter onNavigate={(mod) => onSelectModule(mod)} />
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menüyü Aç / Kapat"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 cursor-pointer transition-all active:scale-95"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Hamburger Drawer Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md px-4 py-3 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
+            {isAdmin && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-200 font-bold text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    <span>Admin Kullanıcı Onay Paneli</span>
+                  </div>
+                  {pendingCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-600 text-white">
+                      {pendingCount} Bekleyen
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-bold cursor-pointer"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+                <span>{theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onLogout();
+                }}
+                className="inline-flex items-center justify-center p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 cursor-pointer"
+                title="Çıkış Yap"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Hub Body */}

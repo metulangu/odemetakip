@@ -3,6 +3,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
@@ -11,6 +18,13 @@
     font-family: 'JetBrains Mono', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
     font-feature-settings: "tnum" 1, "cv01" 1;
   }
+}
+
+/* Prevent unintended horizontal scroll across all screens */
+#root {
+  max-width: 100vw;
+  overflow-x: hidden;
+  min-height: 100vh;
 }
 
 /* Custom scrollbars for clean multi-year horizontal matrix scrolling */

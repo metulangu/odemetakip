@@ -191,6 +191,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
 
   const urgentCount = notifications.filter((n) => n.severity === 'urgent').length;
 
+  // ESC tuşuna basıldığında modalı kapat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       {/* Trigger Button */}
@@ -223,26 +236,32 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
         )}
       </button>
 
-      {/* Modal / Drawer */}
+      {/* Modal / Drawer - Tıklayınca kapanması için arkaplan onClick eklendi */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+        <div
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+          >
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <BellRing className="w-5 h-5" />
+            <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <BellRing className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                     <span>Bildirim Merkezi</span>
                     {notifications.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400">
                         {notifications.length} Aktif Uyarı
                       </span>
                     )}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
                     Ödemeler (±3 gün) ve Doğum Günleri (son 3 gün)
                   </p>
                 </div>
@@ -250,22 +269,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Pencereyi Kapat"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
+                <span>Kapat</span>
               </button>
             </div>
 
-            {/* Phone Notification Permission Bar */}
-            <div className="px-5 py-3 bg-indigo-50/70 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900/50 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs">
+            {/* Phone Notification Quick Bar */}
+            <div className="px-4 sm:px-5 py-2.5 bg-indigo-50/70 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900/50 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs">
                 <Smartphone className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px] sm:text-xs">
                   {permState === 'granted'
                     ? 'Telefon Bildirimleri: Açık ✅'
                     : permState === 'denied'
-                    ? 'Telefon Bildirim İzni Kapalı ⚠️'
-                    : 'Telefona Bildirim Gelmesi İçin İzni Açın:'}
+                    ? 'Telefon Bildirim İzni: Kapalı ⚠️'
+                    : 'Telefon Bildirimlerini Açın:'}
                 </span>
               </div>
 
@@ -274,7 +295,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                   <button
                     type="button"
                     onClick={handleEnablePhoneNotifications}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
                   >
                     📲 Bildirimleri Aç
                   </button>
@@ -282,9 +303,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                   <button
                     type="button"
                     onClick={handleSendTestNotification}
-                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 hover:bg-indigo-50 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-bold cursor-pointer transition-all"
+                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 hover:bg-indigo-50 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-bold cursor-pointer transition-all active:scale-95"
                   >
-                    🔔 Test Bildirimi Gönder
+                    🔔 Telefonda Test Et
                   </button>
                 )}
               </div>
@@ -292,25 +313,81 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
 
             {/* Status Feedback Toast inside modal */}
             {statusFeedback && (
-              <div className="mx-5 mt-3 px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2">
+              <div className="mx-4 sm:mx-5 mt-3 px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
                 <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>{statusFeedback}</span>
+                <span className="text-[11px] sm:text-xs leading-tight">{statusFeedback}</span>
               </div>
             )}
 
-            {/* Notifications List */}
-            <div className="p-5 overflow-y-auto space-y-3 flex-1">
+            {/* Notifications List or Compact Empty State */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1">
               {notifications.length === 0 ? (
-                <div className="text-center py-8 space-y-3">
-                  <div className="w-14 h-14 rounded-3xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-8 h-8" />
+                <div className="py-4 space-y-4">
+                  {/* Kompakt, sade ve gözü yormayan durum kutusu */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+                        Bekleyen Bildirim Yok
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        Yaklaşan (3 gün kala) veya geciken faturanız ya da kutlanmamış doğum günü bildiriminiz bulunmuyor.
+                      </p>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    Harika! Bekleyen Bildirim Yok
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                    Yaklaşan (3 gün kala) veya geciken ödenmemiş faturanız ya da kutlanmamış doğum günü bildiriminiz bulunmuyor.
-                  </p>
+
+                  {/* Telefon Bildirimleri Açma ve Test Paneli */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-indigo-500/[0.06] border border-indigo-500/20 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          Telefon Hatırlatma Sistemi
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        permState === 'granted'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                      }`}>
+                        {permState === 'granted' ? 'Aktif' : 'İzin Gerekli'}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Faturaların son günleri ve doğum günleri sabahları telefonunuza sesli bildirim olarak gelir.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {permState !== 'granted' ? (
+                        <button
+                          type="button"
+                          onClick={handleEnablePhoneNotifications}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Telefonda Bildirimleri Aç</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSendTestNotification}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                        >
+                          <BellRing className="w-3.5 h-3.5" />
+                          <span>Telefona Test Bildirimi Gönder</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Telefonlar için ipucu */}
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-indigo-100 dark:border-indigo-950/80 space-y-0.5">
+                      <p>📱 <strong>iPhone için:</strong> Safari menüsünden <em>"Ana Ekrana Ekle"</em> yaparak açtığınızda bildirimleri sorunsuz alabilirsiniz.</p>
+                      <p>🤖 <strong>Android için:</strong> Chrome'da bildirim iznine <em>"İzin Ver"</em> demeniz yeterlidir.</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 notifications.map((item) => {
@@ -320,7 +397,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                   return (
                     <div
                       key={item.id}
-                      className={`p-4 rounded-2xl border transition-all flex flex-col gap-3 ${
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col gap-2.5 ${
                         isUrgent
                           ? 'bg-rose-500/[0.06] border-rose-500/40 dark:bg-rose-500/[0.08]'
                           : item.type === 'birthday'
@@ -329,9 +406,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-2.5">
                           <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                               isExpense
                                 ? isUrgent
                                   ? 'bg-rose-600 text-white'
@@ -379,7 +456,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                           <button
                             type="button"
                             onClick={() => handleMarkPaid(item)}
-                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>Ödendi İşaretle (Bildirimi Durdur)</span>
@@ -388,7 +465,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
                           <button
                             type="button"
                             onClick={() => handleAcknowledgeBirthday(item)}
-                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>🎉 Kutlandı (Tamam)</span>
@@ -401,11 +478,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNaviga
               )}
             </div>
 
-            {/* Footer Info */}
-            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>
-                💡 Faturalar <strong>Ödendi</strong> yapılana, doğum günleri <strong>Kutlandı (Tamam)</strong> denilene kadar telefona bildirim verir.
+            {/* Footer with Clear Close Button & Helpful Note */}
+            <div className="px-4 sm:px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                💡 Faturalar <strong>Ödendi</strong> yapılana kadar bildirim verir.
               </span>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-bold text-xs shadow-xs cursor-pointer transition-all active:scale-95 shrink-0"
+              >
+                Kapat
+              </button>
             </div>
           </div>
         </div>

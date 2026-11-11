@@ -27,7 +27,8 @@ import {
   AlertCircle,
   CopyX,
   Loader2,
-  Key
+  Key,
+  Menu
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.tsx';
 import { ShoppingCategory, ShoppingItem, ShoppingList } from '../types/shopping.ts';
@@ -151,6 +152,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
     } catch {}
     return '';
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // UI States
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
@@ -780,52 +782,51 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
 
       {/* Top Header Navigation */}
       <header className="border-b border-slate-200/90 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
           
           {/* Logo & Hub Back */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={() => onNavigate('hub')}
-              className="p-1.5 sm:p-2 -ml-1 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 group"
+              className="p-1.5 sm:p-2 -ml-1 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition-all cursor-pointer flex items-center gap-1 group shrink-0"
               title="Modül Seçimine Dön"
             >
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 group-hover:-translate-x-0.5 transition-transform" />
-              <span className="text-xs font-semibold hidden md:inline">Modüller</span>
+              <span className="text-xs font-semibold hidden sm:inline">Modüller</span>
             </button>
 
-            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block" />
+            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block shrink-0" />
 
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shrink-0">
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="min-w-0">
+                <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
                   <span>Alışveriş</span>
                   <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                     <Sparkles className="w-3 h-3" /> Sesle Ekleme
                   </span>
                 </h1>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate max-w-[140px] sm:max-w-none">
-                  Sürtünmesiz &amp; Akıllı Gruplama
+                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">
+                  Akıllı Listem
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Module Switchers & Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            
+          {/* Desktop Right Header Actions (hidden on mobile) */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Switch to Expenses */}
             <button
               type="button"
               onClick={() => onNavigate('expenses')}
               title="Gider & Fatura Tablosuna Git"
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Home className="w-4 h-4" />
-              <span className="hidden sm:inline">Giderler</span>
+              <span>Giderler</span>
             </button>
 
             {/* Switch to Birthdays */}
@@ -833,10 +834,10 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               type="button"
               onClick={() => onNavigate('birthdays')}
               title="Doğum Günü Takibine Git"
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/40 border border-transparent hover:border-pink-200 dark:hover:border-pink-800 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/40 border border-transparent hover:border-pink-200 dark:hover:border-pink-800 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Cake className="w-4 h-4" />
-              <span className="hidden sm:inline">Doğum Günü</span>
+              <span>Doğum Günü</span>
             </button>
 
             {/* Notification Center */}
@@ -869,9 +870,7 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               }`}
             >
               <Sparkles className={`w-3.5 h-3.5 ${hasAiKey ? 'text-purple-600 dark:text-purple-400' : 'text-purple-100 animate-spin'}`} />
-              <span>
-                {hasAiKey ? 'Gemini AI' : 'Gemini Ekle'}
-              </span>
+              <span>{hasAiKey ? 'Gemini AI' : 'Gemini Ekle'}</span>
               {hasAiKey && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
             </button>
 
@@ -893,11 +892,120 @@ export const ShoppingView: React.FC<ShoppingViewProps> = ({ onNavigate, onLogout
               className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Çıkış</span>
+              <span>Çıkış</span>
             </button>
+          </div>
 
+          {/* Mobile Right Controls (md:hidden) */}
+          <div className="flex md:hidden items-center gap-1.5 shrink-0">
+            <NotificationCenter
+              onNavigate={(mod) => {
+                if (mod !== 'shopping') onNavigate(mod);
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menüyü Aç / Kapat"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 cursor-pointer transition-all active:scale-95"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Hamburger Drawer Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md px-4 py-3 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1 block">
+                Modüller
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('expenses');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Home className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Best Home Gider Takibi</span>
+                </div>
+                <span>→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('birthdays');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/15 text-pink-700 dark:text-pink-300 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Cake className="w-4 h-4 text-pink-500" />
+                  <span>Doğum Günü Takip Sistemi</span>
+                </div>
+                <span>→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('hub');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <ArrowLeft className="w-4 h-4 text-slate-500" />
+                  <span>Tüm Modüller (Ana Merkez)</span>
+                </div>
+                <span>→</span>
+              </button>
+            </div>
+
+            {/* Actions: AI Settings, Theme, Logout */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGeminiModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-xs font-bold border border-purple-200 dark:border-purple-800/60 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Gemini AI</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-bold cursor-pointer"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+                <span>{theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="inline-flex items-center justify-center p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 cursor-pointer"
+                title="Çıkış Yap"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
